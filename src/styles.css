@@ -6,6 +6,7 @@
   text-rendering: geometricPrecision;
   --page-pad: clamp(8px, 0.9vw, 16px);
   --hairline: #d9d9d9;
+  --project-gap: clamp(3px, 0.38vw, 7px);
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
 }
@@ -86,19 +87,23 @@ button {
   margin: 0;
 }
 
-.add-mark {
+.header-character {
   position: absolute;
-  top: 8px;
+  top: 4px;
   right: 8px;
-  color: #686868;
-  font-size: 12px;
-  font-weight: 400;
-  line-height: 0.7;
+  display: block;
+  width: auto;
+  height: clamp(40px, 3.8vw, 64px);
+  object-fit: contain;
 }
 
 .project-row {
   min-height: 0;
-  padding: 4px 8px clamp(10px, 1vw, 16px);
+  padding: 0 8px var(--project-gap);
+}
+
+.index-header + .project-row {
+  margin-top: 25px;
 }
 
 .project-metadata {
@@ -182,7 +187,7 @@ button {
 .project-media {
   display: flex;
   align-items: flex-start;
-  gap: clamp(3px, 0.38vw, 7px);
+  gap: var(--project-gap);
   min-width: 0;
   padding-right: clamp(8px, 2vw, 32px);
   overflow-x: auto;
@@ -200,7 +205,7 @@ button {
 
 .project-media--oddware {
   display: grid;
-  grid-template-columns: minmax(0, 1.145fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1.135fr) minmax(0, 1fr);
   padding-right: 0;
   overflow-x: hidden;
   scroll-snap-type: none;
@@ -244,6 +249,10 @@ button {
   height: auto;
 }
 
+.project-shot--crop-y img {
+  transform: scaleY(1.006);
+}
+
 .project-shot video {
   pointer-events: none;
 }
@@ -258,12 +267,12 @@ button {
 }
 
 .project-shot--one {
-  width: clamp(230px, 22vw, 410px);
+  width: clamp(250px, 24vw, 450px);
   animation-delay: 80ms;
 }
 
 .project-shot--two {
-  width: clamp(149.28px, 14.279vw, 266.11px);
+  width: clamp(162.26px, 15.577vw, 292.06px);
   animation-delay: 130ms;
 }
 
@@ -273,7 +282,7 @@ button {
 }
 
 .project-shot--four {
-  width: clamp(228.71px, 21.877vw, 407.71px);
+  width: clamp(248.6px, 23.865vw, 447.5px);
   animation-delay: 230ms;
 }
 
@@ -294,11 +303,23 @@ button {
 }
 
 .project-shot--chapter {
-  width: clamp(230px, 22vw, 410px);
+  width: clamp(250px, 24vw, 450px);
 }
 
 .project-shot--chapter-detail {
-  width: clamp(140px, 13.5vw, 251px);
+  width: clamp(300px, 28vw, 520px);
+}
+
+.project-shot--playmosaic {
+  width: clamp(250px, 24vw, 450px);
+}
+
+.project-shot--hokshi {
+  width: clamp(250px, 24vw, 450px);
+}
+
+.project-shot--hokshi-login {
+  width: clamp(130px, 12.2vw, 230px);
 }
 
 .project-shot--cast-one,
@@ -311,11 +332,13 @@ button {
 .project-shot--cast-seven,
 .project-shot--cast-eight,
 .project-shot--cast-nine {
-  width: clamp(230px, 22vw, 410px);
+  width: clamp(250px, 24vw, 450px);
 }
 
 .project-shot--cast-one { animation-delay: 80ms; }
-.project-shot--cast-eleven { animation-delay: 105ms; }
+.project-shot--cast-eleven {
+  animation-delay: 105ms;
+}
 .project-shot--cast-video { animation-delay: 405ms; }
 
 .project-shot--cast-two {
@@ -383,13 +406,43 @@ button {
   box-shadow: inset 0 0 0 1px rgba(10, 10, 10, 0.22);
 }
 
-.index-count {
+.index-footer {
   position: absolute;
   bottom: 8px;
   left: 8px;
-  margin: 0;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  width: calc(100% - 16px);
   color: #646464;
   font-size: 8px;
+  line-height: 1;
+}
+
+.index-count,
+.index-credit {
+  margin: 0;
+}
+
+.index-credit {
+  grid-column: 2;
+}
+
+.index-links {
+  grid-column: 3;
+  display: flex;
+  justify-content: flex-end;
+  gap: 14px;
+}
+
+.index-links a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.index-links a:hover,
+.index-links a:focus-visible {
+  color: #0a0a0a;
 }
 
 .lightbox {
@@ -725,7 +778,7 @@ button {
 
   .project-row {
     min-height: 0;
-    padding: 0 8px 30px;
+    padding: 0 8px var(--project-gap);
   }
 
   .project-metadata {
@@ -741,7 +794,7 @@ button {
   }
 
   .project-media--oddware {
-    grid-template-columns: minmax(0, 1.145fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1.135fr) minmax(0, 1fr);
     padding: 0 0 16px;
     overflow-x: hidden;
     scroll-snap-type: none;
@@ -752,11 +805,11 @@ button {
   }
 
   .project-shot--one {
-    width: 78vw;
+    width: 82vw;
   }
 
   .project-shot--two {
-    width: 50.626vw;
+    width: 53.22vw;
   }
 
   .project-shot--three {
@@ -764,7 +817,7 @@ button {
   }
 
   .project-shot--four {
-    width: 77.563vw;
+    width: 81.54vw;
   }
 
   .project-shot--oddware-one {
@@ -780,11 +833,23 @@ button {
   }
 
   .project-shot--chapter {
-    width: 78vw;
+    width: 82vw;
   }
 
   .project-shot--chapter-detail {
-    width: 47.7vw;
+    width: 90vw;
+  }
+
+  .project-shot--playmosaic {
+    width: 82vw;
+  }
+
+  .project-shot--hokshi {
+    width: 82vw;
+  }
+
+  .project-shot--hokshi-login {
+    width: 49vw;
   }
 
   .project-shot--cast-one,
@@ -797,7 +862,7 @@ button {
   .project-shot--cast-seven,
   .project-shot--cast-eight,
   .project-shot--cast-nine {
-    width: 78vw;
+    width: 82vw;
   }
 
   .project-shot--cast-two {

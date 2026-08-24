@@ -18,15 +18,15 @@
           <span>Year</span>
         </div>
         <p class="views-label">Selected views</p>
-        <span class="add-mark" aria-hidden="true">+</span>
+        <img class="header-character" src="/images/header/gizmo.png" alt="" aria-hidden="true" />
       </header>
 
       <article class="project-row" aria-labelledby="chapter-title">
         <div class="project-metadata">
           <div class="project-name">
-            <h1 id="chapter-title">Chapter</h1>
+            <h1 id="chapter-title">Chapter (Preview)</h1>
             <p class="project-description">
-              Human connection through experiences that feel strangely familiar.
+              Connecting people through experiences that feel strangely familiar.
             </p>
             <a class="project-link" href="https://usechapter.xyz" target="_blank" rel="noreferrer">
               usechapter.xyz ↗
@@ -37,7 +37,12 @@
         </div>
 
         <div class="project-media" role="group" aria-label="Chapter selected views">
-          <button class="project-shot project-shot--chapter" type="button" data-project="chapter" data-slide="0" aria-label="Open Chapter image 1 of 9"><img src="/images/chapter/ch1.png" alt="" /><span>01</span></button>
+          <button class="project-shot project-shot--chapter" type="button" data-project="chapter" data-slide="0" aria-label="Open Chapter video 1 of 9">
+            <video autoplay muted loop playsinline preload="metadata" aria-hidden="true">
+              <source src="/videos/chapter/chapter.mp4" type="video/mp4" />
+            </video>
+            <span>01</span>
+          </button>
           <button class="project-shot project-shot--chapter" type="button" data-project="chapter" data-slide="1" aria-label="Open Chapter image 2 of 9"><img src="/images/chapter/ch2.png" alt="" /><span>02</span></button>
           <button class="project-shot project-shot--chapter" type="button" data-project="chapter" data-slide="2" aria-label="Open Chapter image 3 of 9"><img src="/images/chapter/ch3.png" alt="" /><span>03</span></button>
           <button class="project-shot project-shot--chapter" type="button" data-project="chapter" data-slide="3" aria-label="Open Chapter image 4 of 9"><img src="/images/chapter/ch4.png" alt="" /><span>04</span></button>
@@ -45,7 +50,7 @@
           <button class="project-shot project-shot--chapter" type="button" data-project="chapter" data-slide="5" aria-label="Open Chapter image 6 of 9"><img src="/images/chapter/ch6.png" alt="" /><span>06</span></button>
           <button class="project-shot project-shot--chapter" type="button" data-project="chapter" data-slide="6" aria-label="Open Chapter image 7 of 9"><img src="/images/chapter/ch7.png" alt="" /><span>07</span></button>
           <button class="project-shot project-shot--chapter" type="button" data-project="chapter" data-slide="7" aria-label="Open Chapter image 8 of 9"><img src="/images/chapter/ch8.png" alt="" /><span>08</span></button>
-          <button class="project-shot project-shot--chapter-detail" type="button" data-project="chapter" data-slide="8" aria-label="Open Chapter image 9 of 9"><img src="/images/chapter/ch9.png" alt="" /><span>09</span></button>
+          <button class="project-shot project-shot--chapter" type="button" data-project="chapter" data-slide="8" aria-label="Open Chapter image 9 of 9"><img src="/images/chapter/ch9.png" alt="" /><span>09</span></button>
         </div>
       </article>
 
@@ -78,7 +83,7 @@
             aria-label="Open Oddware video 2 of 2"
           >
             <video autoplay muted loop playsinline preload="metadata" aria-hidden="true">
-              <source src="/videos/oddware/oddware-hover-demo.mp4" type="video/mp4" />
+              <source src="/videos/oddware/oddware-hover-demo.mp4?v=3" type="video/mp4" />
             </video>
             <span>02</span>
           </button>
@@ -114,7 +119,7 @@
             aria-label="Open Cast video 2 of 13"
           >
             <video autoplay muted loop playsinline preload="metadata" aria-hidden="true">
-              <source src="/videos/cast/c11.mp4" type="video/mp4" />
+              <source src="/videos/cast/c11.mp4?v=2" type="video/mp4" />
             </video>
             <span>02</span>
           </button>
@@ -203,6 +208,27 @@
         </div>
       </article>
 
+      <article class="project-row" aria-labelledby="clawbucket-title">
+        <div class="project-metadata">
+          <div class="project-name">
+            <h2 id="clawbucket-title">Clawbucket</h2>
+            <p class="project-description">
+              Run separate OpenClaws as one team in one place.
+              <span class="project-description-detail">Clawbucket like KFC chicken bucket</span>
+            </p>
+          </div>
+          <p class="project-type">Product / Design</p>
+          <p class="project-year">2026</p>
+        </div>
+
+        <div class="project-media" role="group" aria-label="Clawbucket project images">
+          <button class="project-shot project-shot--one" type="button" data-project="clawbucket" data-slide="0" aria-label="Open Clawbucket image 1 of 4"><img src="/images/clawbucket/cb1.png" alt="" /><span>01</span></button>
+          <button class="project-shot project-shot--two" type="button" data-project="clawbucket" data-slide="1" aria-label="Open Clawbucket image 2 of 4"><img src="/images/clawbucket/cb4-focused.png" alt="" /><span>02</span></button>
+          <button class="project-shot project-shot--three" type="button" data-project="clawbucket" data-slide="2" aria-label="Open Clawbucket image 3 of 4"><img src="/images/clawbucket/cb2-focused.png" alt="" /><span>03</span></button>
+          <button class="project-shot project-shot--four" type="button" data-project="clawbucket" data-slide="3" aria-label="Open Clawbucket image 4 of 4"><img src="/images/clawbucket/cb3-focused.png" alt="" /><span>04</span></button>
+        </div>
+      </article>
+
       <article class="project-row" aria-labelledby="playmosaic-title">
         <div class="project-metadata">
           <div class="project-name">
@@ -216,26 +242,16 @@
           <p class="project-year">2025</p>
         </div>
 
-        <div class="project-media"></div>
-      </article>
-
-      <article class="project-row" aria-labelledby="clawbucket-title">
-        <div class="project-metadata">
-          <div class="project-name">
-            <h2 id="clawbucket-title">Clawbucket</h2>
-            <p class="project-description">
-              Run separate OpenClaws as one team in one place.
-            </p>
-          </div>
-          <p class="project-type">Product / Design</p>
-          <p class="project-year">2025</p>
-        </div>
-
-        <div class="project-media" role="group" aria-label="Clawbucket project images">
-          <button class="project-shot project-shot--one" type="button" data-project="clawbucket" data-slide="0" aria-label="Open Clawbucket image 1 of 4"><img src="/images/clawbucket/cb1.png" alt="" /><span>01</span></button>
-          <button class="project-shot project-shot--two" type="button" data-project="clawbucket" data-slide="1" aria-label="Open Clawbucket image 2 of 4"><img src="/images/clawbucket/cb2-focused.png" alt="" /><span>02</span></button>
-          <button class="project-shot project-shot--three" type="button" data-project="clawbucket" data-slide="2" aria-label="Open Clawbucket image 3 of 4"><img src="/images/clawbucket/cb4-focused.png" alt="" /><span>03</span></button>
-          <button class="project-shot project-shot--four" type="button" data-project="clawbucket" data-slide="3" aria-label="Open Clawbucket image 4 of 4"><img src="/images/clawbucket/cb3-focused.png" alt="" /><span>04</span></button>
+        <div class="project-media" role="group" aria-label="PlayMosaic selected views">
+          <button class="project-shot project-shot--playmosaic" type="button" data-project="playmosaic" data-slide="0" aria-label="Open PlayMosaic image 1 of 9"><img src="/images/playmosaic/m1.png" alt="" /><span>01</span></button>
+          <button class="project-shot project-shot--playmosaic" type="button" data-project="playmosaic" data-slide="1" aria-label="Open PlayMosaic image 2 of 9"><img src="/images/playmosaic/m2.png" alt="" /><span>02</span></button>
+          <button class="project-shot project-shot--playmosaic" type="button" data-project="playmosaic" data-slide="2" aria-label="Open PlayMosaic image 3 of 9"><img src="/images/playmosaic/m4.png" alt="" /><span>03</span></button>
+          <button class="project-shot project-shot--playmosaic" type="button" data-project="playmosaic" data-slide="3" aria-label="Open PlayMosaic image 4 of 9"><img src="/images/playmosaic/m3.png" alt="" /><span>04</span></button>
+          <button class="project-shot project-shot--playmosaic" type="button" data-project="playmosaic" data-slide="4" aria-label="Open PlayMosaic image 5 of 9"><img src="/images/playmosaic/m5.png" alt="" /><span>05</span></button>
+          <button class="project-shot project-shot--playmosaic" type="button" data-project="playmosaic" data-slide="5" aria-label="Open PlayMosaic image 6 of 9"><img src="/images/playmosaic/m6.png" alt="" /><span>06</span></button>
+          <button class="project-shot project-shot--playmosaic" type="button" data-project="playmosaic" data-slide="6" aria-label="Open PlayMosaic image 7 of 9"><img src="/images/playmosaic/m7.png" alt="" /><span>07</span></button>
+          <button class="project-shot project-shot--playmosaic" type="button" data-project="playmosaic" data-slide="7" aria-label="Open PlayMosaic image 8 of 9"><img src="/images/playmosaic/m8.png" alt="" /><span>08</span></button>
+          <button class="project-shot project-shot--playmosaic" type="button" data-project="playmosaic" data-slide="8" aria-label="Open PlayMosaic image 9 of 9"><img src="/images/playmosaic/m9.png" alt="" /><span>09</span></button>
         </div>
       </article>
 
@@ -243,33 +259,33 @@
         <div class="project-metadata">
           <div class="project-name">
             <h2 id="hokshi-title">Hokshi</h2>
+            <p class="project-description">
+              Confess a crush anonymously.
+            </p>
           </div>
-          <p class="project-type"></p>
+          <p class="project-type">Website / Web app</p>
           <p class="project-year">2025</p>
         </div>
 
-        <div class="project-media"></div>
-      </article>
-
-      <article class="project-row" aria-labelledby="rise-title">
-        <div class="project-metadata">
-          <div class="project-name">
-            <h2 id="rise-title">Rise App (Life Reset)</h2>
-            <p class="project-description">
-              Self-improvement app to transform your life in 66 days.
-            </p>
-            <a class="project-link" href="https://lifereset.com" target="_blank" rel="noreferrer">
-              lifereset.com ↗
-            </a>
-          </div>
-          <p class="project-type">Mobile app</p>
-          <p class="project-year">2024</p>
+        <div class="project-media" role="group" aria-label="Hokshi selected views">
+  <button class="project-shot project-shot--hokshi" type="button" data-project="hokshi" data-slide="0" aria-label="Open Hokshi image 1 of 7"><img src="/images/hokshi/h1.png" alt="" /><span>01</span></button>
+  <button class="project-shot project-shot--hokshi" type="button" data-project="hokshi" data-slide="1" aria-label="Open Hokshi image 2 of 7"><img src="/images/hokshi/korean-hero.png" alt="" /><span>02</span></button>
+  <button class="project-shot project-shot--hokshi" type="button" data-project="hokshi" data-slide="2" aria-label="Open Hokshi image 3 of 7"><img src="/images/hokshi/h2.png" alt="" /><span>03</span></button>
+  <button class="project-shot project-shot--hokshi" type="button" data-project="hokshi" data-slide="3" aria-label="Open Hokshi image 4 of 7"><img src="/images/hokshi/h3.png" alt="" /><span>04</span></button>
+  <button class="project-shot project-shot--hokshi" type="button" data-project="hokshi" data-slide="4" aria-label="Open Hokshi image 5 of 7"><img src="/images/hokshi/h4.png" alt="" /><span>05</span></button>
+  <button class="project-shot project-shot--hokshi project-shot--crop-y" type="button" data-project="hokshi" data-slide="5" aria-label="Open Hokshi image 6 of 7"><img src="/images/hokshi/h5.png" alt="" /><span>06</span></button>
+          <button class="project-shot project-shot--hokshi-login" type="button" data-project="hokshi" data-slide="6" aria-label="Open Hokshi image 7 of 7"><img src="/images/hokshi/login-card.png" alt="" /><span>07</span></button>
         </div>
-
-        <div class="project-media"></div>
       </article>
 
-      <p class="index-count">07 / 07</p>
+      <footer class="index-footer">
+        <p class="index-count">06 / 06</p>
+        <p class="index-credit">JUN PARK</p>
+        <nav class="index-links" aria-label="Contact links">
+          <a href="https://x.com/junpk13" target="_blank" rel="noreferrer">X</a>
+          <a href="mailto:parkjundk@gmail.com">EMAIL</a>
+        </nav>
+      </footer>
     </main>
 
     <dialog class="lightbox" aria-label="Project image viewer">
@@ -301,6 +317,12 @@
             </button>
             <button class="product-picker-option" type="button" role="option" data-project="clawbucket" aria-selected="true">
               <span>Clawbucket</span><span aria-hidden="true">04</span>
+            </button>
+            <button class="product-picker-option" type="button" role="option" data-project="playmosaic" aria-selected="false">
+              <span>PlayMosaic</span><span aria-hidden="true">05</span>
+            </button>
+            <button class="product-picker-option" type="button" role="option" data-project="hokshi" aria-selected="false">
+              <span>Hokshi</span><span aria-hidden="true">06</span>
             </button>
           </div>
         </div>

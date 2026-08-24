@@ -18,24 +18,50 @@ const projects = {
   chapter: {
     label: "Chapter",
     slides: [
-      { type: "image", src: "/images/chapter/ch1.png", width: 3420, height: 2026 },
-      { type: "image", src: "/images/chapter/ch2.png", width: 3420, height: 2032 },
-      { type: "image", src: "/images/chapter/ch3.png", width: 3420, height: 2032 },
-      { type: "image", src: "/images/chapter/ch4.png", width: 3420, height: 2058 },
-      { type: "image", src: "/images/chapter/ch5.png", width: 3420, height: 2044 },
-      { type: "image", src: "/images/chapter/ch6.png", width: 3420, height: 2044 },
-      { type: "image", src: "/images/chapter/ch7.png", width: 3420, height: 2044 },
-      { type: "image", src: "/images/chapter/ch8.png", width: 3420, height: 2032 },
-      { type: "image", src: "/images/chapter/ch9.png", width: 300, height: 290 },
+      { type: "video", src: "/videos/chapter/chapter.mp4", width: 1920, height: 1078 },
+      { type: "image", src: "/images/chapter/ch2.png", width: 3420, height: 2004 },
+      { type: "image", src: "/images/chapter/ch3.png", width: 3420, height: 2004 },
+      { type: "image", src: "/images/chapter/ch4.png", width: 3420, height: 2008 },
+      { type: "image", src: "/images/chapter/ch5.png", width: 3420, height: 2026 },
+      { type: "image", src: "/images/chapter/ch6.png", width: 3420, height: 2018 },
+      { type: "image", src: "/images/chapter/ch7.png", width: 3420, height: 2018 },
+      { type: "image", src: "/images/chapter/ch8.png", width: 3420, height: 2014 },
+      { type: "image", src: "/images/chapter/ch9.png", width: 3420, height: 2026 },
     ],
   },
   clawbucket: {
     label: "Clawbucket",
     slides: [
   { src: "/images/clawbucket/cb1.png", width: 1920, height: 1010 },
-      { src: "/images/clawbucket/cb2-focused.png", width: 1393, height: 1129 },
   { src: "/images/clawbucket/cb4-focused.png", width: 1122, height: 1402 },
+      { src: "/images/clawbucket/cb2-focused.png", width: 1393, height: 1129 },
   { src: "/images/clawbucket/cb3-focused.png", width: 1724, height: 912 },
+    ],
+  },
+  playmosaic: {
+    label: "PlayMosaic",
+    slides: [
+      { type: "image", src: "/images/playmosaic/m1.png", width: 3420, height: 2058 },
+      { type: "image", src: "/images/playmosaic/m2.png", width: 3420, height: 2062 },
+      { type: "image", src: "/images/playmosaic/m4.png", width: 3420, height: 2066 },
+      { type: "image", src: "/images/playmosaic/m3.png", width: 2868, height: 2062 },
+      { type: "image", src: "/images/playmosaic/m5.png", width: 2880, height: 2058 },
+      { type: "image", src: "/images/playmosaic/m6.png", width: 2844, height: 1354 },
+      { type: "image", src: "/images/playmosaic/m7.png", width: 2880, height: 2066 },
+      { type: "image", src: "/images/playmosaic/m8.png", width: 3420, height: 2066 },
+      { type: "image", src: "/images/playmosaic/m9.png", width: 3420, height: 2072 },
+    ],
+  },
+  hokshi: {
+    label: "Hokshi",
+  slides: [
+    { type: "image", src: "/images/hokshi/h1.png", width: 3420, height: 2026 },
+    { type: "image", src: "/images/hokshi/korean-hero.png", width: 1920, height: 1080 },
+    { type: "image", src: "/images/hokshi/h2.png", width: 2000, height: 1100 },
+    { type: "image", src: "/images/hokshi/h3.png", width: 1996, height: 1104 },
+    { type: "image", src: "/images/hokshi/h4.png", width: 2176, height: 1114 },
+    { type: "image", src: "/images/hokshi/h5.png", width: 1376, height: 816, cropY: 1.006 },
+    { type: "image", src: "/images/hokshi/login-card.png", width: 1200, height: 1400 },
     ],
   },
   oddware: {
@@ -44,8 +70,8 @@ const projects = {
       { type: "image", src: "/images/oddware/o1.png", width: 1920, height: 1004 },
       {
         type: "video",
-        src: "/videos/oddware/oddware-hover-demo.mp4",
-        width: 1804,
+        src: "/videos/oddware/oddware-hover-demo.mp4?v=3",
+        width: 1820,
         height: 1080,
       },
     ],
@@ -54,7 +80,7 @@ const projects = {
     label: "Cast",
     slides: [
       { type: "image", src: "/images/cast/c1.png", width: 1920, height: 998 },
-      { type: "video", src: "/videos/cast/c11.mp4", width: 1792, height: 1080 },
+      { type: "video", src: "/videos/cast/c11.mp4?v=2", width: 1792, height: 1080 },
       { type: "image", src: "/images/cast/c2.png", width: 1920, height: 548 },
       { type: "image", src: "/images/cast/c3.png", width: 1920, height: 990 },
       { type: "image", src: "/images/cast/c10.png", width: 788, height: 214 },
@@ -101,6 +127,7 @@ function updateSlide(nextIndex, direction = 1, animate = true) {
     lightboxVideo.pause();
     lightboxVideo.hidden = true;
     slide.style.backgroundImage = `url("${selectedSlide.src}")`;
+    slide.style.backgroundSize = selectedSlide.cropY ? `auto ${selectedSlide.cropY * 100}%` : "cover";
   }
 
   slide.style.setProperty("--slide-ratio", selectedSlide.width / selectedSlide.height);
