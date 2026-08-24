@@ -200,14 +200,16 @@ button {
 
 .project-media--oddware {
   display: grid;
-  grid-template-columns: minmax(0, 1.075fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1.145fr) minmax(0, 1fr);
   padding-right: 0;
   overflow-x: hidden;
   scroll-snap-type: none;
 }
 
 .project-media--oddware .project-shot {
+  flex-basis: auto;
   width: 100%;
+  max-width: none;
 }
 
 .project-shot {
@@ -739,7 +741,7 @@ button {
   }
 
   .project-media--oddware {
-    grid-template-columns: minmax(0, 1.075fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1.145fr) minmax(0, 1fr);
     padding: 0 0 16px;
     overflow-x: hidden;
     scroll-snap-type: none;
