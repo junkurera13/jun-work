@@ -87,14 +87,25 @@ button {
   margin: 0;
 }
 
-.header-character {
+.header-character-link {
   position: absolute;
   top: 4px;
   right: 8px;
   display: block;
-  width: auto;
   height: clamp(40px, 3.8vw, 64px);
+  line-height: 0;
+}
+
+.header-character {
+  display: block;
+  width: auto;
+  height: 100%;
   object-fit: contain;
+}
+
+.header-character-link:focus-visible {
+  outline: 1px solid #686868;
+  outline-offset: 3px;
 }
 
 .project-row {
