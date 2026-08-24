@@ -318,6 +318,16 @@ button {
   width: clamp(250px, 24vw, 450px);
 }
 
+.project-shot--hokshi-match-first {
+  aspect-ratio: 3420 / 2026;
+}
+
+.project-shot--hokshi-match-first img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .project-shot--hokshi-login {
   width: clamp(130px, 12.2vw, 230px);
 }
@@ -407,13 +417,11 @@ button {
 }
 
 .index-footer {
-  position: absolute;
-  bottom: 8px;
-  left: 8px;
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  width: calc(100% - 16px);
+  width: 100%;
+  padding: 18px 8px 0;
   color: #646464;
   font-size: 8px;
   line-height: 1;
