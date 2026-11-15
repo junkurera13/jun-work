@@ -1,298 +1,452 @@
-const lightbox = document.querySelector(".lightbox");
-const slide = document.querySelector(".lightbox-slide");
-const lightboxVideo = document.querySelector(".lightbox-video");
-const slideCount = document.querySelector(".slide-count");
-const productPicker = document.querySelector(".product-picker");
-const productPickerTrigger = document.querySelector(".product-picker-trigger");
-const productPickerLabel = document.querySelector(".product-picker-label");
-const productPickerMenu = document.querySelector(".product-picker-menu");
-const productPickerOptions = [...document.querySelectorAll(".product-picker-option")];
-const closeButton = document.querySelector(".close-button");
-const previousButton = document.querySelector(".nav-button--previous");
-const nextButton = document.querySelector(".nav-button--next");
-const shots = [...document.querySelectorAll(".project-shot")];
-const inlineVideos = [...document.querySelectorAll(".project-shot video")];
-const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+import "./styles.css";
+import { Renderer } from "./render/renderer.js";
+import { engravingCanvas } from "./render/engraving.js";
+import { CrackAudio } from "./audio/crack.js";
+import { Dial } from "./ui/dial.js";
+import { Fracture } from "./sim/fracture.js";
+import { Liquid } from "./sim/liquid.js";
+import { MELT_SECONDS, TEMP_DEFAULT, meltParams, rateForTemp } from "./sim/melt.js";
+import { bodyOuter, sdStick, STICK_Y0 } from "./sim/shape.js";
+import { mat3FromQuat, mulMat3, mulMat3T, quatFromAxisAngle, quatMul } from "./sim/math.js";
 
-const projects = {
-  chapter: {
-    label: "Chapter",
-    slides: [
-      { type: "video", src: "/videos/chapter/chapter.mp4", width: 1920, height: 1078 },
-      { type: "image", src: "/images/chapter/ch2.png", width: 3420, height: 2004 },
-      { type: "image", src: "/images/chapter/ch3.png", width: 3420, height: 2004 },
-      { type: "image", src: "/images/chapter/ch4.png", width: 3420, height: 2008 },
-      { type: "image", src: "/images/chapter/ch5.png", width: 3420, height: 2026 },
-      { type: "image", src: "/images/chapter/ch6.png", width: 3420, height: 2018 },
-      { type: "image", src: "/images/chapter/ch7.png", width: 3420, height: 2018 },
-      { type: "image", src: "/images/chapter/ch8.png", width: 3420, height: 2014 },
-      { type: "image", src: "/images/chapter/ch9.png", width: 3420, height: 2026 },
-    ],
+const canvas = document.querySelector("#scene");
+const controls = document.querySelector(".controls");
+const resetBtn = document.querySelector(".reset");
+const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+const FOV = (24 * Math.PI) / 180;
+const TAN = Math.tan(FOV / 2);
+const OBJ_CENTER_Y = -2.25; // middle of bar + stick in object space
+const REST_YAW = -0.4;
+
+let renderer;
+try {
+  renderer = new Renderer(canvas);
+} catch {
+  document.body.classList.add("no-webgl");
+}
+
+const audio = new CrackAudio();
+const fracture = new Fracture();
+const liquid = new Liquid();
+
+const state = {
+  P: 0,
+  temp: TEMP_DEFAULT,
+  yaw: REST_YAW,
+  pitch: 0,
+  yawVel: 0,
+  pitchVel: 0,
+  lastInput: -10,
+  appear: 0, // 0 -> 1 entrance animation
+  time: 0,
+  shake: 0,
+};
+
+const dial = new Dial(controls, {
+  onChange: (t) => {
+    state.temp = t;
   },
-  clawbucket: {
-    label: "Clawbucket",
-    slides: [
-  { src: "/images/clawbucket/cb1.png", width: 1920, height: 1010 },
-  { src: "/images/clawbucket/cb4-focused.png", width: 1122, height: 1402 },
-      { src: "/images/clawbucket/cb2-focused.png", width: 1393, height: 1129 },
-  { src: "/images/clawbucket/cb3-focused.png", width: 1724, height: 912 },
-    ],
+  onTick: (t) => audio.tick(0.8 + t * 0.6),
+});
+
+// --------------------------------------------------------------- camera ----
+
+const cam = { pos: { x: 0, y: 0, z: 50 }, basis: [], D: 50 };
+
+function updateCamera() {
+  const w = canvas.clientWidth || window.innerWidth;
+  const h = canvas.clientHeight || window.innerHeight;
+  const aspect = w / h;
+  const needH = 14.3 / 0.64;
+  const needW = 7.2 / 0.78;
+  const D = Math.max(needH / (2 * TAN), needW / (2 * TAN * aspect));
+  cam.D = D;
+  const elev = 0.09;
+  cam.pos = { x: 0, y: Math.sin(elev) * D, z: Math.cos(elev) * D };
+  // basis looking at the origin
+  const f = norm({ x: -cam.pos.x, y: -cam.pos.y, z: -cam.pos.z });
+  const r = norm(cross(f, { x: 0, y: 1, z: 0 }));
+  const u = cross(r, f);
+  cam.right = r;
+  cam.up = u;
+  cam.fwd = f;
+  cam.aspect = aspect;
+  cam.floorY = -D * TAN - 1;
+}
+
+function cross(a, b) {
+  return { x: a.y * b.z - a.z * b.y, y: a.z * b.x - a.x * b.z, z: a.x * b.y - a.y * b.x };
+}
+function norm(a) {
+  const l = Math.hypot(a.x, a.y, a.z) || 1;
+  return { x: a.x / l, y: a.y / l, z: a.z / l };
+}
+
+// ---------------------------------------------------------------- world ----
+
+const world = {
+  quat: [0, 0, 0, 1],
+  rot: mat3FromQuat([0, 0, 0, 1]),
+  pos: { x: 0, y: 0, z: 0 },
+  objToWorld(x, y, z) {
+    const p = mulMat3(this.rot, x, y, z);
+    return { x: p.x + this.pos.x, y: p.y + this.pos.y, z: p.z + this.pos.z };
   },
-  playmosaic: {
-    label: "PlayMosaic",
-    slides: [
-      { type: "image", src: "/images/playmosaic/m1.png", width: 3420, height: 2058 },
-      { type: "image", src: "/images/playmosaic/m2.png", width: 3420, height: 2062 },
-      { type: "image", src: "/images/playmosaic/m4.png", width: 3420, height: 2066 },
-      { type: "image", src: "/images/playmosaic/m3.png", width: 2868, height: 2062 },
-      { type: "image", src: "/images/playmosaic/m5.png", width: 2880, height: 2058 },
-      { type: "image", src: "/images/playmosaic/m6.png", width: 2844, height: 1354 },
-      { type: "image", src: "/images/playmosaic/m7.png", width: 2880, height: 2066 },
-      { type: "image", src: "/images/playmosaic/m8.png", width: 3420, height: 2066 },
-      { type: "image", src: "/images/playmosaic/m9.png", width: 3420, height: 2072 },
-    ],
+  worldToObj(x, y, z) {
+    return mulMat3T(this.rot, x - this.pos.x, y - this.pos.y, z - this.pos.z);
   },
-  hokshi: {
-    label: "Hokshi",
-  slides: [
-    { type: "image", src: "/images/hokshi/h1.png", width: 3420, height: 2026 },
-    { type: "image", src: "/images/hokshi/korean-hero.png", width: 1920, height: 1080 },
-    { type: "image", src: "/images/hokshi/h2.png", width: 2000, height: 1100 },
-    { type: "image", src: "/images/hokshi/h3.png", width: 1996, height: 1104 },
-    { type: "image", src: "/images/hokshi/h4.png", width: 2176, height: 1114 },
-    { type: "image", src: "/images/hokshi/h5.png", width: 1376, height: 816, cropY: 1.006 },
-    { type: "image", src: "/images/hokshi/login-card.png", width: 1200, height: 1400 },
-    ],
-  },
-  oddware: {
-    label: "Oddware",
-    slides: [
-      { type: "image", src: "/images/oddware/o1.png", width: 1920, height: 1004 },
-      {
-        type: "video",
-        src: "/videos/oddware/oddware-hover-demo.mp4?v=3",
-        width: 1820,
-        height: 1080,
-      },
-    ],
-  },
-  cast: {
-    label: "Cast",
-    slides: [
-      { type: "image", src: "/images/cast/c1.png", width: 1920, height: 998 },
-      { type: "video", src: "/videos/cast/c11.mp4?v=2", width: 1792, height: 1080 },
-      { type: "image", src: "/images/cast/c2.png", width: 1920, height: 548 },
-      { type: "image", src: "/images/cast/c3.png", width: 1920, height: 990 },
-      { type: "image", src: "/images/cast/c10.png", width: 788, height: 214 },
-      { type: "image", src: "/images/cast/c4.png", width: 1920, height: 1020 },
-      { type: "image", src: "/images/cast/c12.png", width: 1340, height: 1644 },
-      { type: "image", src: "/images/cast/c5.png", width: 3420, height: 2032 },
-      { type: "image", src: "/images/cast/c6.png", width: 3420, height: 2058 },
-      { type: "image", src: "/images/cast/c7.png", width: 3420, height: 2080 },
-      { type: "video", src: "/videos/cast/cast.mp4", width: 1776, height: 1080 },
-      { type: "image", src: "/images/cast/c8.png", width: 3420, height: 2066 },
-      { type: "image", src: "/images/cast/c9.png", width: 3420, height: 2076 },
-    ],
+  worldDirToObj(x, y, z) {
+    return mulMat3T(this.rot, x, y, z);
   },
 };
 
-let activeProjectKey = "clawbucket";
-let activeSlide = 0;
-let closeTimer;
+function easeOutBack(t) {
+  const c1 = 1.25;
+  const c3 = c1 + 1;
+  return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+}
 
-const formatNumber = (number) => String(number).padStart(2, "0");
+function updateWorld() {
+  const t = state.time;
+  const idle = reduceMotion ? 0 : 1;
+  const a = easeOutBack(Math.min(1, state.appear));
+  const sway = idle * Math.min(1, Math.max(0, t - state.lastInput - 1.5) / 3);
+  const yaw = state.yaw + sway * 0.09 * Math.sin(t * 0.33) + (1 - a) * 0.9;
+  const pitch = state.pitch + sway * 0.03 * Math.sin(t * 0.27 + 1.0);
+  const roll = sway * 0.022 * Math.sin(t * 0.41 + 2.0) + state.shake * 0.012 * Math.sin(t * 90);
+  let q = quatFromAxisAngle(0, 1, 0, yaw);
+  q = quatMul(q, quatFromAxisAngle(1, 0, 0, pitch));
+  q = quatMul(quatFromAxisAngle(0, 0, 1, roll), q);
+  world.quat = q;
+  world.rot = mat3FromQuat(q);
+  const bob = idle * 0.14 * Math.sin(t * 0.6);
+  const drop = (1 - a) * 26;
+  world.pos = {
+    x: state.shake * 0.03 * Math.sin(t * 77),
+    y: -OBJ_CENTER_Y + bob + drop,
+    z: 0,
+  };
+}
 
-inlineVideos.forEach((video) => {
-  const play = () => video.play().catch(() => {});
-  if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) play();
-  else video.addEventListener("canplay", play, { once: true });
+// --------------------------------------------------------------- picking ---
+
+function sceneDistJS(x, y, z, M) {
+  return Math.min(bodyOuter(x, y, z, M), sdStick(x, y, z));
+}
+
+function pick(clientX, clientY) {
+  const rect = canvas.getBoundingClientRect();
+  const ux = (clientX - rect.left - rect.width / 2) / (rect.height / 2);
+  const uy = (rect.height / 2 - (clientY - rect.top)) / (rect.height / 2);
+  const dw = norm({
+    x: cam.right.x * ux * TAN + cam.up.x * uy * TAN + cam.fwd.x,
+    y: cam.right.y * ux * TAN + cam.up.y * uy * TAN + cam.fwd.y,
+    z: cam.right.z * ux * TAN + cam.up.z * uy * TAN + cam.fwd.z,
+  });
+  const ro = world.worldToObj(cam.pos.x, cam.pos.y, cam.pos.z);
+  const rd = world.worldDirToObj(dw.x, dw.y, dw.z);
+  const M = meltParams(state.P);
+  let t = cam.D - 12;
+  for (let i = 0; i < 140; i++) {
+    const x = ro.x + rd.x * t;
+    const y = ro.y + rd.y * t;
+    const z = ro.z + rd.z * t;
+    const d = sceneDistJS(x, y, z, M);
+    if (d < 0.004) {
+      const e = 0.003;
+      const n = norm({
+        x: sceneDistJS(x + e, y, z, M) - sceneDistJS(x - e, y, z, M),
+        y: sceneDistJS(x, y + e, z, M) - sceneDistJS(x, y - e, z, M),
+        z: sceneDistJS(x, y, z + e, M) - sceneDistJS(x, y, z - e, M),
+      });
+      const onBody = bodyOuter(x, y, z, M) < sdStick(x, y, z) + 0.002;
+      return { x, y, z, normal: n, onBody, M };
+    }
+    t += d * 0.85;
+    if (t > cam.D + 12) break;
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------- input ----
+
+let pointer = null;
+let hoverPending = false;
+
+function onDown(e) {
+  if (e.button !== undefined && e.button > 0) return;
+  audio.ensure();
+  try {
+    canvas.setPointerCapture?.(e.pointerId);
+  } catch {
+    /* synthetic pointer */
+  }
+  pointer = { id: e.pointerId, x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, moved: false, t: performance.now() };
+  state.lastInput = state.time;
+  if (state.appear < 0.9) return;
+  const hit = pick(e.clientX, e.clientY);
+  if (!hit) return;
+  if (state.P >= 0.995) {
+    newIceCream();
+    return;
+  }
+  if (hit.onBody) {
+    const res = fracture.impact(hit, state.time, hit.M, world);
+    if (res) {
+      const pan = (e.clientX / window.innerWidth) * 2 - 1;
+      audio.crack(res.type, pan, res.strength);
+      state.shake = res.type === "pop" ? 1 : res.type === "crack" ? 0.7 : 0.3;
+      if (navigator.vibrate) navigator.vibrate(res.type === "pop" ? 14 : 8);
+      canvas.classList.add("has-cracked");
+      revealReset();
+    }
+  }
+}
+
+function onMove(e) {
+  if (pointer && e.pointerId === pointer.id) {
+    const dx = e.clientX - pointer.x;
+    const dy = e.clientY - pointer.y;
+    pointer.x = e.clientX;
+    pointer.y = e.clientY;
+    if (Math.hypot(e.clientX - pointer.sx, e.clientY - pointer.sy) > 4) pointer.moved = true;
+    if (pointer.moved) {
+      state.yaw += dx * 0.0085;
+      state.pitch = Math.max(-0.32, Math.min(0.32, state.pitch + dy * 0.0045));
+      state.yawVel = dx * 0.0085 * 60;
+      state.pitchVel = dy * 0.0045 * 60;
+      state.lastInput = state.time;
+      canvas.classList.add("is-dragging");
+    }
+    return;
+  }
+  if (!hoverPending && e.pointerType === "mouse") {
+    hoverPending = true;
+    requestAnimationFrame(() => {
+      hoverPending = false;
+      const hit = pick(e.clientX, e.clientY);
+      canvas.classList.toggle("is-hover", !!hit && (hit.onBody || state.P >= 0.995));
+    });
+  }
+}
+
+function onUp(e) {
+  if (!pointer || e.pointerId !== pointer.id) return;
+  if (!pointer.moved) {
+    state.yawVel = 0;
+    state.pitchVel = 0;
+  }
+  pointer = null;
+  canvas.classList.remove("is-dragging");
+}
+
+canvas.addEventListener("pointerdown", onDown);
+window.addEventListener("pointermove", onMove);
+window.addEventListener("pointerup", onUp);
+window.addEventListener("pointercancel", onUp);
+canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+
+window.addEventListener("keydown", (e) => {
+  if (e.target.closest?.(".controls")) return;
+  if (e.key === "ArrowLeft") state.yawVel -= 2;
+  if (e.key === "ArrowRight") state.yawVel += 2;
 });
 
-function updateSlide(nextIndex, direction = 1, animate = true) {
-  const activeProject = projects[activeProjectKey];
-  const slideTotal = activeProject.slides.length;
-  activeSlide = (nextIndex + slideTotal) % slideTotal;
-  const selectedSlide = activeProject.slides[activeSlide];
-  const isVideo = selectedSlide.type === "video";
+function revealReset() {
+  resetBtn.hidden = false;
+  requestAnimationFrame(() => resetBtn.classList.add("is-visible"));
+}
 
-  if (isVideo) {
-    slide.style.backgroundImage = "none";
-    if (lightboxVideo.getAttribute("src") !== selectedSlide.src) {
-      lightboxVideo.src = selectedSlide.src;
-    }
-    lightboxVideo.hidden = false;
-    lightboxVideo.currentTime = 0;
-    lightboxVideo.play().catch(() => {});
-  } else {
-    lightboxVideo.pause();
-    lightboxVideo.hidden = true;
-    slide.style.backgroundImage = `url("${selectedSlide.src}")`;
-    slide.style.backgroundSize = selectedSlide.cropY ? `auto ${selectedSlide.cropY * 100}%` : "cover";
+function newIceCream() {
+  state.P = 0;
+  state.appear = 0;
+  state.yaw = REST_YAW;
+  state.pitch = 0;
+  state.yawVel = 0;
+  state.pitchVel = 0;
+  fracture.reset();
+  liquid.reset();
+  canvas.classList.remove("has-cracked");
+  resetBtn.classList.remove("is-visible");
+  if (renderer) renderer.uploadCells(fracture.data);
+}
+
+resetBtn.addEventListener("click", () => {
+  audio.ensure();
+  newIceCream();
+});
+
+// ----------------------------------------------------------------- loop ----
+
+const BODY_BOX = { min: [-3.6, -9.45, -1.8], max: [3.6, 5.25, 1.8] };
+
+function sceneBounds() {
+  const min = BODY_BOX.min.slice();
+  const max = BODY_BOX.max.slice();
+  return { min, max };
+}
+
+function grow(b, p, r) {
+  b.min[0] = Math.min(b.min[0], p.x - r);
+  b.min[1] = Math.min(b.min[1], p.y - r);
+  b.min[2] = Math.min(b.min[2], p.z - r);
+  b.max[0] = Math.max(b.max[0], p.x + r);
+  b.max[1] = Math.max(b.max[1], p.y + r);
+  b.max[2] = Math.max(b.max[2], p.z + r);
+}
+
+function project(p) {
+  const w = world.objToWorld(p.x, p.y, p.z);
+  const d = { x: w.x - cam.pos.x, y: w.y - cam.pos.y, z: w.z - cam.pos.z };
+  const z = d.x * cam.fwd.x + d.y * cam.fwd.y + d.z * cam.fwd.z;
+  const x = (d.x * cam.right.x + d.y * cam.right.y + d.z * cam.right.z) / (z * TAN);
+  const y = (d.x * cam.up.x + d.y * cam.up.y + d.z * cam.up.z) / (z * TAN);
+  // to 0..1 screen (uv.x is scaled by aspect)
+  return { x: 0.5 + x / (2 * cam.aspect), y: 0.5 + y / 2 };
+}
+
+function scissorFor(b) {
+  let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+  for (let i = 0; i < 8; i++) {
+    const p = {
+      x: i & 1 ? b.max[0] : b.min[0],
+      y: i & 2 ? b.max[1] : b.min[1],
+      z: i & 4 ? b.max[2] : b.min[2],
+    };
+    const s = project(p);
+    x0 = Math.min(x0, s.x);
+    y0 = Math.min(y0, s.y);
+    x1 = Math.max(x1, s.x);
+    y1 = Math.max(y1, s.y);
   }
+  const m = 0.01;
+  return [x0 - m, y0 - m, x1 + m, y1 + m];
+}
 
-  slide.style.setProperty("--slide-ratio", selectedSlide.width / selectedSlide.height);
-  slideCount.textContent = `${formatNumber(activeSlide + 1)} / ${formatNumber(slideTotal)}`;
-  slide.setAttribute(
-    "aria-label",
-    `${activeProject.label} ${isVideo ? "video" : "screenshot"} ${activeSlide + 1} of ${slideTotal}`,
-  );
-  previousButton.disabled = slideTotal <= 1;
-  nextButton.disabled = slideTotal <= 1;
+let last = performance.now();
+let lastFrameStart = last;
 
-  if (!animate || reducedMotion.matches) return;
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = Math.min(0.05, Math.max(0, (now - last) / 1000));
+  last = now;
+  state.time += dt;
 
-  slide.getAnimations().forEach((animation) => animation.cancel());
-  slide.animate(
-    [
-      {
-        opacity: 0.55,
-        transform: `translate3d(${direction * 2.5}%, 0, -28px) rotateY(${direction * -3}deg)`,
-      },
-      {
-        opacity: 1,
-        transform: "translate3d(0, 0, 0) rotateY(0deg)",
-      },
-    ],
+  // melting
+  const rate = rateForTemp(state.temp);
+  if (state.appear >= 1) state.P = Math.min(1, state.P + (dt * rate) / MELT_SECONDS);
+  if (state.P > 0.04) revealReset();
+  const M = meltParams(state.P);
+
+  // motion
+  // the entrance runs on wall-clock time so it never drags on slow devices
+  state.appear = Math.min(1, state.appear + Math.min(0.25, (now - (frame.prev ?? now)) / 1000) / 1.1);
+  frame.prev = now;
+  if (!pointer) {
+    state.yaw += state.yawVel * dt;
+    state.pitch = Math.max(-0.32, Math.min(0.32, state.pitch + state.pitchVel * dt));
+    const k = Math.exp(-dt * 3.2);
+    state.yawVel *= k;
+    state.pitchVel *= k;
+    // drift gently back towards the nicest angle when left alone
+    if (state.time - state.lastInput > 6 && !reduceMotion) {
+      const target = REST_YAW + Math.round((state.yaw - REST_YAW) / (2 * Math.PI)) * 2 * Math.PI;
+      state.yaw += (target - state.yaw) * (1 - Math.exp(-dt * 0.25));
+      state.pitch += (0 - state.pitch) * (1 - Math.exp(-dt * 0.25));
+    }
+  }
+  state.shake = Math.max(0, state.shake - dt * 7);
+  updateWorld();
+
+  if (!renderer || !renderer.u) return;
+
+  fracture.update(dt, state.time, rate, M, world, cam.floorY);
+  if (fracture.texDirty) {
+    renderer.uploadCells(fracture.data);
+    fracture.texDirty = false;
+  }
+  liquid.update(dt, state.time, rate, M, fracture.leakSources(), world, cam.floorY);
+
+  const dyn = renderer.dyn;
+  const liq = liquid.pack(dyn, 64, world);
+  const fr = fracture.pack(dyn, 64, world);
+  renderer.uploadDyn();
+
+  const b = sceneBounds();
+  if (liq.count) {
+    grow(b, { x: liq.min[0], y: liq.min[1], z: liq.min[2] }, 0.1);
+    grow(b, { x: liq.max[0], y: liq.max[1], z: liq.max[2] }, 0.1);
+  }
+  for (const [p, r] of fracture.bounds(world)) grow(b, p, r + 0.05);
+  // the stick tip is the lowest point that is always there
+  b.min[1] = Math.min(b.min[1], STICK_Y0 - 0.2);
+
+  renderer.resize();
+  const camObj = world.worldToObj(cam.pos.x, cam.pos.y, cam.pos.z);
+  const r = world.worldDirToObj(cam.right.x, cam.right.y, cam.right.z);
+  const u = world.worldDirToObj(cam.up.x, cam.up.y, cam.up.z);
+  const f = world.worldDirToObj(cam.fwd.x, cam.fwd.y, cam.fwd.z);
+
+  renderer.draw(
     {
-      duration: 240,
-      easing: "cubic-bezier(0.23, 1, 0.32, 1)",
+      camPos: camObj,
+      camBasis: [r.x, r.y, r.z, u.x, u.y, u.z, f.x, f.y, f.z],
+      tanHalfFov: TAN,
+      objRot: world.rot,
+      time: state.time,
+      boundMin: b.min,
+      boundMax: b.max,
+      melt: M,
+      cracks: fracture.any,
+      primCount: liq.count,
+      fragCount: fr.frags,
+      crumbCount: fr.crumbs,
+      liqMin: liq.count ? liq.min : [0, 0, 0],
+      liqMax: liq.count ? liq.max : [0, 0, 0],
+      exposure: 1.0,
     },
+    scissorFor(b),
   );
+
+  const ft = now - lastFrameStart;
+  lastFrameStart = now;
+  if (ft < 200) renderer.adapt(ft);
 }
 
-function openLightbox(projectKey, index) {
-  window.clearTimeout(closeTimer);
-  activeProjectKey = projectKey;
-  updateProductPicker(projectKey);
-  updateSlide(index, 1, false);
-  lightbox.showModal();
-  document.body.style.overflow = "hidden";
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => lightbox.setAttribute("data-open", ""));
-  });
+// ----------------------------------------------------------------- boot ----
+
+updateCamera();
+window.addEventListener("resize", () => {
+  updateCamera();
+  renderer?.resize();
+});
+
+if (renderer) {
+  renderer.setTextTexture(engravingCanvas());
+  renderer.resize(true);
+  renderer
+    .ready()
+    .then(() => {
+      renderer.uploadCells(fracture.data);
+      document.body.classList.add("is-ready");
+      state.appear = 0;
+      last = performance.now();
+      requestAnimationFrame(frame);
+    })
+    .catch((err) => {
+      console.error(err);
+      document.body.classList.add("no-webgl");
+    });
 }
 
-function closeLightbox() {
-  if (!lightbox.open) return;
-  closeProductPicker(false);
-  lightboxVideo.pause();
-  lightbox.removeAttribute("data-open");
-  closeTimer = window.setTimeout(
-    () => {
-      lightbox.close();
-      document.body.style.overflow = "";
-    },
-    reducedMotion.matches ? 100 : 250,
-  );
-}
-
-shots.forEach((shot) => {
-  shot.addEventListener("click", () => {
-    openLightbox(shot.dataset.project, Number(shot.dataset.slide));
-  });
-});
-
-function updateProductPicker(projectKey) {
-  productPickerLabel.textContent = projects[projectKey].label;
-  productPickerOptions.forEach((option) => {
-    option.setAttribute("aria-selected", String(option.dataset.project === projectKey));
-  });
-}
-
-function openProductPicker() {
-  productPickerMenu.hidden = false;
-  productPicker.setAttribute("data-open", "");
-  productPickerTrigger.setAttribute("aria-expanded", "true");
-  const activeOption = productPickerOptions.find(
-    (option) => option.dataset.project === activeProjectKey,
-  );
-  requestAnimationFrame(() => activeOption?.focus());
-}
-
-function closeProductPicker(returnFocus = true) {
-  if (productPickerMenu.hidden) return;
-  productPicker.removeAttribute("data-open");
-  productPickerTrigger.setAttribute("aria-expanded", "false");
-  productPickerMenu.hidden = true;
-  if (returnFocus) productPickerTrigger.focus();
-}
-
-function selectProject(projectKey) {
-  activeProjectKey = projectKey;
-  updateProductPicker(projectKey);
-  updateSlide(0, 1, !reducedMotion.matches);
-  closeProductPicker();
-}
-
-productPickerTrigger.addEventListener("click", () => {
-  if (productPickerMenu.hidden) openProductPicker();
-  else closeProductPicker();
-});
-
-productPickerTrigger.addEventListener("keydown", (event) => {
-  if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
-  event.preventDefault();
-  openProductPicker();
-});
-
-productPickerOptions.forEach((option) => {
-  option.addEventListener("click", () => selectProject(option.dataset.project));
-});
-
-productPickerMenu.addEventListener("keydown", (event) => {
-  const currentIndex = productPickerOptions.indexOf(document.activeElement);
-  let nextIndex = currentIndex;
-
-  if (event.key === "ArrowDown") nextIndex = (currentIndex + 1) % productPickerOptions.length;
-  else if (event.key === "ArrowUp") nextIndex = (currentIndex - 1 + productPickerOptions.length) % productPickerOptions.length;
-  else if (event.key === "Home") nextIndex = 0;
-  else if (event.key === "End") nextIndex = productPickerOptions.length - 1;
-  else if (event.key === "Escape") {
-    event.preventDefault();
-    closeProductPicker();
-    return;
-  } else return;
-
-  event.preventDefault();
-  productPickerOptions[nextIndex].focus();
-});
-
-previousButton.addEventListener("click", () => updateSlide(activeSlide - 1, -1));
-nextButton.addEventListener("click", () => updateSlide(activeSlide + 1, 1));
-closeButton.addEventListener("click", closeLightbox);
-
-lightbox.addEventListener("cancel", (event) => {
-  event.preventDefault();
-  closeLightbox();
-});
-
-lightbox.addEventListener("click", (event) => {
-  if (!productPickerMenu.hidden && !productPicker.contains(event.target)) {
-    closeProductPicker(false);
-  }
-  if (event.target === lightbox) closeLightbox();
-});
-
-document.addEventListener("keydown", (event) => {
-  if (!lightbox.open) return;
-
-  if (event.key === "Escape") {
-    event.preventDefault();
-    if (!productPickerMenu.hidden) {
-      closeProductPicker();
-      return;
-    }
-    closeLightbox();
-    return;
-  }
-
-  if (event.key === "ArrowLeft") {
-    event.preventDefault();
-    updateSlide(activeSlide - 1, -1, false);
-  }
-
-  if (event.key === "ArrowRight") {
-    event.preventDefault();
-    updateSlide(activeSlide + 1, 1, false);
-  }
-});
+// handy for poking at the simulation from the console
+window.__ice = {
+  state,
+  setMelt: (p) => {
+    state.P = Math.max(0, Math.min(1, p));
+  },
+  setTemp: (t) => dial.set(t),
+  tap: (x, y) => onDown({ clientX: x, clientY: y, pointerId: 1, button: 0 }) || onUp({ pointerId: 1 }),
+  renew: newIceCream,
+};
