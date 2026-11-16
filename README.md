@@ -40,7 +40,7 @@ npm run build
 | `src/shaders/scene.frag.glsl` | The ray marcher: SDF model, fracture field, liquid, materials and studio lighting |
 | `src/shaders/common.glsl` | Shared SDF / noise helpers (the bar shape lives here) |
 | `src/sim/shape.js` | JS mirror of the SDF, used for picking and to keep drips on the surface |
-| `src/sim/melt.js` | Melt timeline, plus the temperature → speed mapping |
+| `src/sim/melt.js` | Melt timeline, plus each weather's melt speed and light tint |
 | `src/sim/fracture.js` | Crack paths (painted into a texture the shader reads), crushing, flying chips |
 | `src/sim/liquid.js` | Rivulets, hanging drops, pinch-off and falling drops |
 | `src/audio/crack.js` | Procedural chocolate-snap sounds |
