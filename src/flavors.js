@@ -26,14 +26,15 @@ export const FLAVORS = [
     label: "A pink Faluda popsicle with a vanilla ice cream center. Tap to crack the icy shell.",
   },
   {
-    id: "passionfruit",
-    name: "passionfruit",
-    // same ice-lolly mould as the faluda, but solid fruit ice all the way
-    // through: no vanilla, just golden pulp with the black seeds frozen in
+    id: "passion-coconut",
+    name: "passionfruit coconut",
+    // a boxier lolly mould with two grooves down each face: creamy coconut
+    // ice, topped with a layer of passionfruit pulp (seeds and all) that has
+    // run down the faces before it froze
     faluda: true,
-    passion: true,
+    coco: true,
     shell: "ice",
-    swatch: { x: 0.35, y: -1.2, half: 1.5 },
-    label: "A golden passionfruit ice lolly, full of black seeds. Tap to crack the ice.",
+    swatch: { x: 0.2, y: 3.4, half: 1.5 },
+    label: "A coconut ice lolly topped with passionfruit pulp and seeds. Tap to crack the ice.",
   },
 ];

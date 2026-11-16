@@ -123,8 +123,19 @@ export function sdBar(x, y, z) {
   return (f - 1) / Math.max(Math.hypot(gx, gy, gz), 1e-4);
 }
 
-function faludaCorner(y) {
+function faludaCorner(y, coco) {
+  if (coco) return mix(0.38, 1.05, smoothstep(BAR_MID - 1, BAR_MID + 1, y));
   return mix(0.8, 2.05, smoothstep(BAR_MID - 1, BAR_MID + 1, y));
+}
+
+const COCO_GROOVE_X = 0.88;
+function cocoGrooves(x, y) {
+  const dx = Math.abs(Math.abs(x) - COCO_GROOVE_X);
+  const along =
+    smoothstep(BAR_BOTTOM + 0.35, BAR_BOTTOM + 0.95, y) *
+    (1 - smoothstep(BAR_BOTTOM + BAR_HEIGHT - 1.75, BAR_BOTTOM + BAR_HEIGHT - 1, y));
+  const prof = 1 - smoothstep(0, 0.15, dx);
+  return 0.065 * prof * prof * (3 - 2 * prof) * along;
 }
 
 function roundedRect(x, y, w, h, radius) {
@@ -139,10 +150,14 @@ function roundedExtrusion(profile, z, thickness, bevel) {
   return Math.hypot(Math.max(dx, 0), Math.max(dy, 0)) + Math.min(Math.max(dx, dy), 0) - bevel;
 }
 
-export function sdFaluda(x, y, z) {
-  const o = roundedRect(x, y - BAR_MID, FALUDA_W, BAR_HEIGHT / 2, faludaCorner(y));
+export function sdFaluda(x, y, z, coco = false) {
+  const o = roundedRect(x, y - BAR_MID, FALUDA_W, BAR_HEIGHT / 2, faludaCorner(y, coco));
   const ex = x / FALUDA_W;
   const ey = (y - BAR_MID) / (BAR_HEIGHT / 2);
+  if (coco) {
+    const tc = FALUDA_T - 0.05 * ex * ex - 0.03 * ey * ey;
+    return (roundedExtrusion(o, z, tc, 0.6) + cocoGrooves(x, y)) * 0.88;
+  }
   const t = FALUDA_T - 0.09 * ex * ex - 0.04 * ey * ey;
   return roundedExtrusion(o, z, t, FALUDA_EDGE) * 0.97;
 }
@@ -156,8 +171,8 @@ export function sdBlob(x, y, z) {
   return (k0 * (k0 - 1)) / Math.max(k1, 1e-4);
 }
 
-export function sdMelting(x, y, z, morph, faluda) {
-  const a = faluda ? sdFaluda(x, y, z) : sdBar(x, y, z);
+export function sdMelting(x, y, z, morph, faluda, coco = false) {
+  const a = faluda ? sdFaluda(x, y, z, coco) : sdBar(x, y, z);
   if (!(morph > 0)) return a;
   return a + (sdBlob(x, y, z) - a) * morph;
 }
@@ -185,7 +200,7 @@ export function refToObj(qx, qy, qz, sag, bulge, taper = 0, shrink = 0) {
 
 export function bodyOuter(x, y, z, M) {
   const q = deformRef(x, y, z, M.sag, M.bulge, M.taper, M.shrink);
-  let d = sdMelting(q.x, q.y, q.z, M.morph, M.faluda);
+  let d = sdMelting(q.x, q.y, q.z, M.morph, M.faluda, M.coco);
   if (M.erode > 0) {
     d += M.erode * (0.5 + 0.5 * q.hn);
     d += Math.min(M.erode, 1.2) * 0.5 * (sn3(x * 0.9 + 3.1, y * 0.9 + 7.7, z * 0.9 + 1.3) - 0.5);
@@ -225,9 +240,9 @@ export function sdStick(x, y, z, faluda) {
 // scene.frag.glsl.
 
 /** Cross-section of the undeformed bar at height y: half width W, half thickness T. */
-export function crossSection(y, faluda) {
+export function crossSection(y, faluda, coco = false) {
   if (faluda) {
-    const radius = faludaCorner(y);
+    const radius = faludaCorner(y, coco);
     const dy = Math.max(0, Math.abs(y - BAR_MID) - BAR_HEIGHT / 2 + radius);
     const W = FALUDA_W - radius + Math.sqrt(Math.max(0, radius * radius - dy * dy));
     return { W, T: FALUDA_T, R: (2 * (W + FALUDA_T)) / Math.PI };
@@ -241,8 +256,8 @@ export function crossSection(y, faluda) {
 }
 
 /** Reference-space point -> chart (u, y). */
-export function toChart(x, y, z, faluda) {
-  const c = crossSection(y, faluda);
+export function toChart(x, y, z, faluda, coco = false) {
+  const c = crossSection(y, faluda, coco);
   if (faluda) {
     // Project onto the box perimeter so fractures keep their proportions on the flat faces.
     const nx = Math.abs(x) / c.W;
@@ -256,8 +271,8 @@ export function toChart(x, y, z, faluda) {
 }
 
 /** Chart (u, y) -> reference-space surface direction (x on the surface, side +1 front / -1 back). */
-export function fromChart(u, y, faluda) {
-  const c = crossSection(y, faluda);
+export function fromChart(u, y, faluda, coco = false) {
+  const c = crossSection(y, faluda, coco);
   if (faluda) {
     const half = Math.PI * c.R;
     const wrapped = ((u + half) % (2 * half) + 2 * half) % (2 * half) - half;

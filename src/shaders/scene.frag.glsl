@@ -12,7 +12,7 @@ uniform float uTanHalfFov;
 uniform mat3 uObjRot;      // object -> world rotation
 uniform float uTime;
 uniform bool uFaluda;
-uniform bool uPassion;   // passionfruit: faluda mould, solid fruit ice with seeds
+uniform bool uCoco;      // passionfruit coconut: grooved lolly mould, coconut ice under passionfruit
 uniform bool uThumb;      // picker icon: no backdrop, coverage goes to alpha
 
 uniform vec3 uBoundMin;
@@ -92,7 +92,7 @@ vec3 deformRef(vec3 p, float sag, float bulge, float taper, float shrink, out fl
 
 float bodyOuter(vec3 p, out vec3 q, out float hn) {
   q = deformRef(p, uSag, uBulge, uTaper, uShrink, hn);
-  float d = sdMelting(q, uMorph, uFaluda);
+  float d = sdMelting(q, uMorph, uFaluda, uCoco);
   if (uErode > 0.0) {
     d += uErode * (0.5 + 0.5 * hn);
     d += min(uErode, 1.2) * 0.5 * (sn3(p * 0.9 + vec3(3.1, 7.7, 1.3)) - 0.5);
@@ -111,7 +111,7 @@ float bodyOuter(vec3 p, out vec3 q, out float hn) {
 float crackS(vec3 q) {
   float y = q.y;
   if (uFaluda) {
-    float radius = faludaCorner(y);
+    float radius = faludaCorner(y, uCoco);
     float dy = max(0.0, abs(y - BAR_MID) - BAR_HEIGHT * 0.5 + radius);
     float w = FALUDA_W - radius + sqrt(max(0.0, radius * radius - dy * dy));
     float nx = abs(q.x) / w;
@@ -543,7 +543,7 @@ Mat faludaIce(vec3 p, vec3 q, float melt) {
   vec3 rose = srgb(vec3(0.92, 0.19, 0.38));
   vec3 c = mix(deep, rose, tone);
   // frost bloom
-  float o = faludaOutline(q.xy);
+  float o = faludaOutline(q.xy, false);
   float rim = 1.0 - smoothstep(0.25, 1.35, -o);
   float top = smoothstep(2.6, 5.6, q.y);
   float patchy = smoothstep(0.25, 0.75, sn3(p * 1.7 + 11.0) * 0.7 + sn3(p * 4.1 + 3.0) * 0.3);
@@ -569,100 +569,153 @@ vec3 hash33(vec3 p) {
   return fract((p.xxy + p.yxx) * p.zyx);
 }
 
-// Passionfruit seeds frozen right through the ice. Each one is a flat black
-// teardrop wrapped in a little sac of glossy orange gel. They sit at every
-// depth: the ones just under the surface are sharp and black, deeper ones
-// blur and fade into the golden ice. Reference space, so they ride along
-// with the melting shape. x = seed, y = gel sac, z = how close to the surface.
-const float SEED_CELL = 0.53;
+// ------------------------------------------------- passionfruit coconut ----
+// Creamy coconut ice with a layer of passionfruit pulp poured on top. The pulp
+// line is wavy, and before it froze some of it ran down the faces in drips
+// and thin streaks onto the white.
+
+// The dip line on one face (side = +1 front, -1 back): gently wavy.
+float cocoEdge(float x, float side) {
+  return 1.45 + 0.2 * sin(x * 1.6 + side * 1.9) + 0.09 * sin(x * 3.7 + 0.4 + side);
+}
+
+// Signed distance to the edge of the pulp on one face (negative inside it).
+// The drips grow out of the layer with a smooth, flared root and taper down
+// to a soft rounded end, like syrup running before it froze.
+float cocoDipDist(vec2 xy, float side) {
+  float d = cocoEdge(xy.x, side) - xy.y;
+  for (int i = 0; i < 5; i++) {
+    vec2 h = hash22(vec2(float(i) * 3.7 + 1.0, side * 5.3 + 2.0));
+    float h2 = hash12(vec2(float(i) * 1.9 + 4.0, side * 2.1 + 9.0));
+    float x0 = -1.95 + 3.9 * (float(i) + 0.15 + 0.7 * h.x) / 5.0;
+    bool thin = h.y > 0.6;
+    float w = thin ? 0.05 + 0.03 * h2 : 0.13 + 0.1 * h2;
+    float len = thin ? 0.9 + 2.0 * (h.y - 0.6) / 0.4 : 0.25 + 0.9 * h.y;
+    float e0 = cocoEdge(x0, side);
+    float x = xy.x + 0.035 * sin(xy.y * 2.3 + h2 * 6.0);
+    float dd = sdRoundCone(vec3(x, xy.y, 0.0), vec3(x0, e0 + 0.2, 0.0), vec3(x0, e0 - len, 0.0), w * 1.2, w * 0.8);
+    d = smin(d, dd, thin ? 0.16 : 0.3);
+  }
+  return d;
+}
+
+// How much passionfruit pulp is at this point (reference space). surface: on
+// the outside, including the drips; otherwise just the layer itself. Front
+// and back blend smoothly across the sides, so the line wraps round unbroken.
+float cocoPulp(vec3 q, bool surface) {
+  float wF = smoothstep(-0.75, 0.75, q.z);
+  if (!surface) {
+    float edge = mix(cocoEdge(q.x, -1.0), cocoEdge(q.x, 1.0), wF);
+    return smoothstep(edge - 0.04, edge + 0.04, q.y);
+  }
+  if (q.y < -2.0) return 0.0;
+  float d = mix(cocoDipDist(q.xy, -1.0), cocoDipDist(q.xy, 1.0), wF);
+  return smoothstep(0.018, -0.018, d);
+}
+
+// Passionfruit seeds in the pulp layer: a dark olive-black oval inside a
+// pale, glassy yellow-green sac of gel that bulges a little. Most sit just
+// under the surface; deeper ones fade into the pulp. Reference space, so they
+// ride along with the melting shape. x = seed, y = gel sac, z = sac rim.
+// Writes the sacs' bulge into gSeedBump (a tilt for the normal).
+vec3 gSeedBump = vec3(0.0);
+const float SEED_CELL = 0.62;
 vec3 passionSeeds(vec3 q, vec3 n) {
-  vec3 cq = q / SEED_CELL;
-  vec3 ci = floor(cq);
+  gSeedBump = vec3(0.0);
+  if (q.y < 1.0) return vec3(0.0);
+  vec3 ci = floor(q / SEED_CELL);
   float seed = 0.0;
   float gel = 0.0;
-  float near = 0.0;
+  float rim = 0.0;
   for (int k = 0; k < 27; k++) {
     vec3 o = vec3(float(k % 3), float((k / 3) % 3), float(k / 9)) - 1.0;
     vec3 c = ci + o;
     vec3 h = hash33(c + 17.0);
-    if (h.x > 0.62) continue;                 // not every cell has a seed
+    if (h.x > 0.42) continue;                 // not every cell has a seed
     vec3 ctr = (c + 0.18 + 0.64 * hash33(c * 1.7 + 3.1)) * SEED_CELL;
+    if (cocoPulp(ctr, false) < 0.5) continue; // only in the passionfruit
     vec3 v = q - ctr;
     float depth = dot(v, n);                  // > 0: the seed is under the surface
-    if (depth < -0.1 || depth > 0.38) continue;
+    if (depth < -0.12 || depth > 0.3) continue;
     vec3 lat = v - n * depth;
-    float l = length(lat);
-    if (l > 0.42) continue;
-    // a flat teardrop lying at a random angle
+    if (dot(lat, lat) > 0.2) continue;
     vec3 a = normalize(hash33(c * 2.3 + 9.0) - 0.5);
     a = a - n * dot(a, n);
     a = dot(a, a) > 1e-4 ? normalize(a) : normalize(cross(n, vec3(0.0, 0.0, 1.0)) + 1e-3);
     float along = dot(lat, a);
     float across = length(lat - a * along);
     float size = 0.85 + 0.3 * h.y;
-    float ra = 0.18 * size;
-    float rc = 0.12 * size * (1.0 - 0.3 * clamp(along / ra, -1.0, 1.0));
-    float e = length(vec2(along / ra, across / rc));
     float dd = max(depth, 0.0);
-    // looked at through the ice, deeper seeds spread out and fade
-    float grow = 1.0 + 0.45 * dd;
-    float soft = 0.1 + 1.1 * dd;
-    float vis = mix(1.0, 0.0, smoothstep(0.03, 0.34, dd));
-    float sd = (1.0 - smoothstep(grow - soft, grow + soft, e)) * vis;
-    seed = max(seed, sd);
-    // the gel sac round it, a little off-centre
-    float gl = length(lat - a * 0.04 * size) / (0.33 * size * (1.0 + 0.6 * dd));
-    gel = max(gel, (1.0 - smoothstep(0.45, 1.0, gl)) * mix(1.0, 0.2, smoothstep(0.0, 0.38, dd)));
-    near = max(near, sd * (1.0 - smoothstep(0.0, 0.12, dd)));
+    float vis = 1.0 - smoothstep(0.02, 0.28, dd);
+    // the seed: a plump oval, a touch pointed at one end
+    float ra = 0.19 * size;
+    float rc = 0.14 * size * (1.0 - 0.18 * clamp(along / ra, -1.0, 1.0));
+    float e = length(vec2(along / ra, across / rc));
+    float soft = 0.12 + 1.2 * dd;
+    seed = max(seed, (1.0 - smoothstep(1.0 - soft, 1.0 + soft, e)) * vis);
+    // the gel sac round it
+    vec3 gv = lat - a * 0.03 * size;
+    float R = 0.33 * size;
+    float gl = length(vec2(dot(gv, a) / (R * 1.12), length(gv - a * dot(gv, a)) / R));
+    float sac = (1.0 - smoothstep(0.8, 1.0, gl)) * vis;
+    gel = max(gel, sac);
+    rim = max(rim, smoothstep(0.55, 0.9, gl) * (1.0 - smoothstep(0.9, 1.0, gl)) * vis);
+    // it bulges: tilt the normal away from the sac centre
+    float near = 1.0 - smoothstep(0.0, 0.1, dd);
+    gSeedBump += gv / R * 0.22 * near * (1.0 - smoothstep(0.75, 1.05, gl));
   }
-  return vec3(seed, gel, near);
+  return vec3(seed, gel, rim);
 }
 
-// Passionfruit ice: golden pulp frozen solid, cloudy with darker orange
-// streaks of juice, a pale butter-yellow frost on the rims, and the seeds in
-// their gel all through it. Melting, it goes wet, glossy and deeper orange.
-// inner: freshly exposed ice inside a break (no frost, more seeds in view).
-Mat passionIce(vec3 p, vec3 q, vec3 n, float melt, bool inner) {
+// Coconut ice is milky and opaque (a soft, frosty white); the passionfruit
+// pulp is glossy golden orange, a little translucent, and paler where it runs
+// thin. Melting, both go wet and glossy. inner: inside a break (no drips,
+// no frost).
+Mat cocoIce(vec3 p, vec3 q, vec3 n, float melt, bool inner) {
   Mat m;
   float thaw = smoothstep(0.0, 0.5, melt);
-  float cloud = sn3(p * vec3(1.3, 0.55, 1.3) + vec3(2.0, 6.0, 1.0));
-  float cloud2 = vnoise3(p * vec3(5.0, 1.8, 5.0) + 7.0);
-  float tone = clamp(0.45 + 0.9 * (cloud - 0.5) + 0.4 * (cloud2 - 0.5), 0.0, 1.0);
-  vec3 deep = srgb(vec3(0.95, 0.42, 0.0));
-  vec3 gold = srgb(vec3(1.0, 0.6, 0.03));
-  vec3 c = mix(deep, gold, tone);
-  float frost = 0.0;
-  float crystal = 0.0;
-  if (!inner) {
-    float o = faludaOutline(q.xy);
-    float rim = 1.0 - smoothstep(0.25, 1.35, -o);
-    float top = smoothstep(2.6, 5.6, q.y);
-    float patchy = smoothstep(0.25, 0.75, sn3(p * 1.7 + 4.0) * 0.7 + sn3(p * 4.1 + 8.0) * 0.3);
-    frost = clamp(0.04 + 0.4 * rim + 0.1 * top, 0.0, 1.0) * mix(0.55, 1.0, patchy) * (1.0 - thaw);
-    c = mix(c, srgb(vec3(1.0, 0.86, 0.55)), frost * 0.4);
-    crystal = smoothstep(0.9, 0.97, vnoise3(p * 52.0 + 2.0)) * (1.0 - thaw);
-    c = mix(c, srgb(vec3(1.0, 0.95, 0.8)), crystal * 0.4);
+  float pulp = cocoPulp(q, !inner);
+  // coconut: a soft warm white with faint milky clouding
+  float cloud = sn3(p * vec3(1.6, 0.7, 1.6) + vec3(5.0, 2.0, 8.0));
+  vec3 coco = mix(srgb(vec3(0.93, 0.925, 0.9)), srgb(vec3(0.97, 0.965, 0.945)), cloud);
+  float crystal = inner ? 0.0 : smoothstep(0.9, 0.97, vnoise3(p * 52.0 + 2.0)) * (1.0 - thaw);
+  coco = mix(coco, vec3(1.0), crystal * 0.5);
+  // pulp
+  float tone = clamp(0.5 + 0.9 * (sn3(p * vec3(1.8, 0.9, 1.8) + 3.0) - 0.5) + 0.4 * (vnoise3(p * 6.0 + 7.0) - 0.5), 0.0, 1.0);
+  vec3 fruit = mix(srgb(vec3(0.93, 0.5, 0.02)), srgb(vec3(0.98, 0.62, 0.06)), tone);
+  // thin at its edges (where it ran), so the white shows through a little
+  float thin = 1.0 - smoothstep(0.0, 1.0, pulp);
+  fruit = mix(fruit, srgb(vec3(1.0, 0.76, 0.28)), 0.45 * smoothstep(0.0, 0.6, (1.0 - pulp) * 2.0) * step(0.02, pulp));
+  vec3 sd = vec3(0.0);
+  if (pulp > 0.02) {
+    sd = passionSeeds(q, n);
+    sd *= pulp;
+    gSeedBump *= pulp * (inner ? 0.0 : 1.0);
+    // the gel: pale and glassy, yellow-green, brighter at its rim
+    fruit = mix(fruit, srgb(vec3(0.86, 0.7, 0.2)), 0.6 * sd.y);
+    fruit = mix(fruit, srgb(vec3(0.97, 0.82, 0.38)), 0.1 * sd.z);
+    fruit = mix(fruit, srgb(vec3(0.13, 0.14, 0.07)), clamp(sd.x * 1.15, 0.0, 1.0));
+  } else {
+    gSeedBump = vec3(0.0);
   }
-  c = mix(c, srgb(vec3(0.95, 0.46, 0.02)), thaw * 0.4);
-  // seeds and their gel (frost veils the ones just under the surface a little)
-  vec3 sd = passionSeeds(q, n);
-  float veil = 1.0 - 0.45 * frost;
-  c = mix(c, srgb(vec3(0.88, 0.32, 0.0)), 0.6 * sd.y);
-  c = mix(c, srgb(vec3(0.04, 0.025, 0.012)), clamp(sd.x * 1.15, 0.0, 1.0) * veil);
+  vec3 c = mix(coco, fruit, pulp);
+  // melting: the coconut goes a touch creamier, the pulp a juicier orange
+  // (never darker or browner)
+  c = mix(c, mix(c * vec3(0.98, 0.975, 0.95), srgb(vec3(0.97, 0.52, 0.02)), pulp), thaw * 0.3);
   m.albedo = c;
-  float rough = mix(0.34 + 0.24 * frost + 0.1 * crystal, 0.07, thaw);
-  // the gel and the seed coats are glassy smooth
-  rough = mix(rough, 0.1, max(sd.y * 0.6, sd.z) * (1.0 - frost));
-  m.rough = inner ? mix(0.16, 0.07, thaw) : rough;
-  m.sss = 0.85 * (1.0 - 0.75 * sd.x);
-  m.sssCol = srgb(vec3(1.0, 0.62, 0.12));
-  m.spec = mix(0.8, 1.15, max(thaw, sd.z * 0.5));
-  m.sheen = inner ? 0.0 : mix(0.1 + 0.45 * frost, 0.0, thaw);
+  float roughC = mix(0.5 + 0.12 * crystal, 0.12, thaw);
+  float roughF = mix(0.2, 0.07, thaw);
+  roughF = mix(roughF, 0.12, max(sd.y, sd.x) * 0.6);
+  m.rough = mix(roughC, roughF, pulp);
+  m.sss = mix(0.55, 0.85, pulp) * (1.0 - 0.7 * sd.x);
+  m.sssCol = mix(srgb(vec3(1.0, 0.97, 0.9)), srgb(vec3(1.0, 0.6, 0.12)), pulp);
+  m.spec = mix(mix(0.6, 1.1, thaw), 1.05, pulp);
+  m.sheen = inner ? 0.0 : mix(0.3, 0.0, max(thaw, pulp));
   return m;
 }
 
 Mat shellMaterial(vec3 p, vec3 q, vec3 n, float melt) {
-  if (uPassion) return passionIce(p, q, n, melt, false);
+  if (uCoco) return cocoIce(p, q, n, melt, false);
   if (uFaluda) return faludaIce(p, q, melt);
   return chocolate(p, melt);
 }
@@ -681,12 +734,12 @@ Mat vanilla(float melt) {
 
 Mat fracture() {
   Mat m;
-  if (uPassion) {
-    // freshly broken fruit ice: paler gold, crystalline and lit from within
-    m.albedo = srgb(vec3(1.0, 0.8, 0.38));
-    m.rough = 0.42;
-    m.sss = 0.9;
-    m.sssCol = srgb(vec3(1.0, 0.66, 0.2));
+  if (uCoco) {
+    // freshly broken coconut ice: bright white and crystalline
+    m.albedo = srgb(vec3(0.98, 0.975, 0.96));
+    m.rough = 0.5;
+    m.sss = 0.6;
+    m.sssCol = srgb(vec3(1.0, 0.97, 0.9));
     m.spec = 0.9;
     m.sheen = 0.35;
     return m;
@@ -746,6 +799,7 @@ vec3 shade(vec3 p, vec3 rd, float pix) {
 
   // ------- material selection
   Mat m;
+  vec3 seedBump = vec3(0.0);
   float bumpAmp = 0.0;
   float bumpFreq = 1.0;
   float bumpAmp2 = 0.0;
@@ -757,11 +811,11 @@ vec3 shade(vec3 p, vec3 rd, float pix) {
   if (P.frag <= best + 1e-5) {
     if (P.fragSide < 0.5) { m = shellMaterial(p, P.q, n, uMeltC * 0.8); bumpAmp = 0.06; bumpFreq = 1.6; }
     else if (P.fragSide < 1.5) { m = fracture(); bumpAmp = 0.5; bumpFreq = 30.0; }
-    else if (uPassion) { m = passionIce(p, P.q, n, uMeltC, true); bumpAmp = 0.2; bumpFreq = 22.0; }
+    else if (uCoco) { m = cocoIce(p, P.q, n, uMeltC, true); bumpAmp = 0.2; bumpFreq = 22.0; }
     else { m = vanilla(0.1); m.albedo *= 0.96; bumpAmp = 0.35; bumpFreq = 22.0; }
   } else if (P.crumb <= best + 1e-5) {
     m = fracture();
-    m.albedo = mix(m.albedo, srgb(uPassion ? vec3(0.98, 0.6, 0.06) : uFaluda ? vec3(0.91, 0.17, 0.47) : vec3(0.36, 0.2, 0.11)), 0.5);
+    m.albedo = mix(m.albedo, srgb(uCoco ? vec3(0.95, 0.94, 0.9) : uFaluda ? vec3(0.91, 0.17, 0.47) : vec3(0.36, 0.2, 0.11)), 0.5);
     bumpAmp = 0.5; bumpFreq = 25.0;
   } else {
     // body (shell / core), stick, liquid blend
@@ -772,7 +826,7 @@ vec3 shade(vec3 p, vec3 rd, float pix) {
         // (chocolate, or wet ice: never chocolate under the faluda's rose ice)
         float slumpS = smoothstep(0.2, 0.55, uMeltC);
         Mat soft;
-        if (uPassion) soft = passionIce(p, P.q, n, chocLocal, true);
+        if (uCoco) soft = cocoIce(p, P.q, n, chocLocal, true);
         else if (uFaluda) soft = faludaIce(p, P.q, chocLocal);
         else soft = chocolate(p, chocLocal);
         bm = mixMat(fracture(), soft, slumpS);
@@ -784,15 +838,16 @@ vec3 shade(vec3 p, vec3 rd, float pix) {
         if (uFaluda) {
           // ice turns white around a break (stress crazing)
           float craze = smoothstep(0.03, 0.4, P.cnear) * (1.0 - chocLocal);
-          bm.albedo = mix(bm.albedo, srgb(uPassion ? vec3(1.0, 0.92, 0.7) : vec3(1.0, 0.8, 0.87)), 0.5 * craze);
+          bm.albedo = mix(bm.albedo, srgb(uCoco ? vec3(1.0, 1.0, 0.98) : vec3(1.0, 0.8, 0.87)), 0.5 * craze);
           bm.rough = mix(bm.rough, 0.55, 0.5 * craze);
           bm.sheen += 0.4 * craze;
         }
       }
-    } else if (uPassion) {
-      // no vanilla in this one: under the outer ice is just more fruit ice
-      bm = passionIce(p, P.q, n, chocLocal, true);
-      bm.albedo *= mix(P.cao, 1.0, 0.5);
+    } else if (uCoco) {
+      // no vanilla in this one: under the outer ice is just more of the same
+      bm = cocoIce(p, P.q, n, chocLocal, true);
+      // (no extra darkening in the gaps: the shadows there are enough, and
+      // darkened pulp starts to read as a brown layer)
       bumpAmp = mix(0.12, 0.03, chocLocal); bumpFreq = 21.0;
     } else {
       float vm = clamp(uMeltV * 1.15 + P.fill * 0.6 + P.hole * uMeltV * 0.4, 0.0, 1.0);
@@ -802,19 +857,23 @@ vec3 shade(vec3 p, vec3 rd, float pix) {
       bumpAmp = mix(0.42, 0.04, vm); bumpFreq = 21.0;
       bumpAmp2 = mix(0.08, 0.0, vm); bumpFreq2 = 3.0;
     }
+    // the passionfruit gel sacs bulge (only on the body, not the stick or drips)
+    if (uCoco && P.shell <= P.core) seedBump = gSeedBump;
     float engr = 0.0;
     if (P.stick < 0.05 && abs(p.z) > 0.05) engr = engraveMask(p);
     Mat sm = wood(p, engr);
     float ws = sminMix(P.body, P.stick, uStickK);
+    seedBump *= 1.0 - ws;
     if (ws > 0.5) { bumpAmp = 0.22; bumpFreq = 55.0; bumpAmp2 = 0.0; }
     bm = mixMat(bm, sm, ws);
     float dbs = smin(P.body, P.stick, uStickK);
     float wl = sminMix(dbs, P.liq, 0.13);
+    seedBump *= 1.0 - wl;
     if (wl > 0.0) {
       Mat lv = vanilla(1.0);
-      lv.albedo = srgb(uPassion ? vec3(0.98, 0.58, 0.05) : uFaluda ? vec3(0.98, 0.76, 0.8) : vec3(0.99, 0.9, 0.66));
+      lv.albedo = srgb(uCoco ? vec3(0.97, 0.96, 0.92) : uFaluda ? vec3(0.98, 0.76, 0.8) : vec3(0.99, 0.9, 0.66));
       Mat lc = shellMaterial(p, P.q, n, 1.0);
-      lc.albedo = srgb(uPassion ? vec3(0.96, 0.5, 0.02) : uFaluda ? vec3(0.84, 0.1, 0.34) : vec3(0.4, 0.235, 0.135));
+      lc.albedo = srgb(uCoco ? vec3(0.97, 0.56, 0.03) : uFaluda ? vec3(0.84, 0.1, 0.34) : vec3(0.4, 0.235, 0.135));
       lc.rough = 0.08;
       Mat lm = mixMat(lv, lc, P.liqC);
       lm.rough = 0.07;
@@ -827,6 +886,7 @@ vec3 shade(vec3 p, vec3 rd, float pix) {
 
   vec3 nb = bumpNormal(p, n, bumpFreq, bumpAmp);
   nb = bumpNormal(p * 1.37, nb, bumpFreq2, bumpAmp2);
+  if (uCoco) nb = normalize(nb + seedBump);
 
   // ------- lighting (in world space)
   vec3 nW = normalize(uObjRot * nb);
@@ -870,7 +930,7 @@ vec3 shade(vec3 p, vec3 rd, float pix) {
   // frost: a pale velvety glow where the surface turns away from you
   if (m.sheen > 0.0) {
     float graze = pow(1.0 - NoV, 2.5);
-    col += m.sheen * srgb(uPassion ? vec3(1.0, 0.95, 0.8) : vec3(1.0, 0.86, 0.91)) * graze
+    col += m.sheen * srgb(uCoco ? vec3(1.0, 0.99, 0.97) : vec3(1.0, 0.86, 0.91)) * graze
          * (envIrr(nW) * ao * 0.45 + keyCol * clamp(NoL + 0.3, 0.0, 1.0) * mix(sh, 1.0, 0.4) * 0.22);
   }
   return col;

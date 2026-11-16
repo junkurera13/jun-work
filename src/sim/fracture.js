@@ -77,7 +77,7 @@ export class Fracture {
     this.reset();
   }
 
-  reset(faluda = false) {
+  reset(faluda = false, coco = false) {
     const g = this.g;
     g.globalCompositeOperation = "source-over";
     g.fillStyle = "#000";
@@ -95,11 +95,12 @@ export class Fracture {
     this.nextId = 1;
     this.off = 0;
     this.faluda = faluda;
+    this.coco = coco;
   }
 
   /** Distance once around the bar at height y (cm). */
   period(y) {
-    return 2 * Math.PI * crossSection(y, this.faluda).R;
+    return 2 * Math.PI * crossSection(y, this.faluda, this.coco).R;
   }
 
   /**
@@ -143,7 +144,7 @@ export class Fracture {
   press(hit, now, M, world) {
     const q = deformRef(hit.x, hit.y, hit.z, M.sag, M.bulge, M.taper, M.shrink);
     const face = 0; // one chart all the way round
-    const ch = toChart(q.x, q.y, q.z, this.faluda);
+    const ch = toChart(q.x, q.y, q.z, this.faluda, this.coco);
     q.x = ch.u;
     this.any = true;
     this.ooze = Math.max(this.ooze, 0.22); // a press squeezes a little vanilla up
@@ -639,7 +640,7 @@ export class Fracture {
     if (this.ooze < 0.5) return [];
     const out = this.impacts.map((imp) => {
       const y = imp.hole > 0.15 ? imp.y - imp.hole * 0.9 : Math.max(imp.low, imp.y - 1.0);
-      const r = fromChart(imp.x, y, this.faluda);
+      const r = fromChart(imp.x, y, this.faluda, this.coco);
       return { id: `i${imp.id}`, x: r.x + Math.sin(imp.id * 7.3) * 0.12, y, side: r.side, hole: imp.hole > 0.15, fill: this.ooze };
     });
     out.sort((a, b) => a.y - b.y);

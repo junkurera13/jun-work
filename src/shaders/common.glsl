@@ -135,7 +135,9 @@ float sdBar(vec3 p) {
 
 // Outline corner radius: a generous, almost-round top and small squared-off
 // shoulders at the bottom where it was poured into the mould.
-float faludaCorner(float y) {
+// coco: the passionfruit-coconut mould is boxier, with tighter corners.
+float faludaCorner(float y, bool coco) {
+  if (coco) return mix(0.38, 1.05, smoothstep(BAR_MID - 1.0, BAR_MID + 1.0, y));
   return mix(0.8, 2.05, smoothstep(BAR_MID - 1.0, BAR_MID + 1.0, y));
 }
 
@@ -149,16 +151,32 @@ float sdRoundedExtrusion(float profile, float z, float thickness, float bevel) {
   return length(max(d, 0.0)) + min(max(d.x, d.y), 0.0) - bevel;
 }
 
-float faludaOutline(vec2 p) {
-  return sdRoundedRect(p - vec2(0.0, BAR_MID), vec2(FALUDA_W, BAR_HEIGHT * 0.5), faludaCorner(p.y));
+float faludaOutline(vec2 p, bool coco) {
+  return sdRoundedRect(p - vec2(0.0, BAR_MID), vec2(FALUDA_W, BAR_HEIGHT * 0.5), faludaCorner(p.y, coco));
+}
+
+// The coconut mould's two grooves down each face, splitting it into three
+// panels. They stop short of the bottom and of the rounded top.
+const float COCO_GROOVE_X = 0.88;
+float cocoGrooves(vec2 p) {
+  float dx = abs(abs(p.x) - COCO_GROOVE_X);
+  float along = smoothstep(BAR_BOTTOM + 0.35, BAR_BOTTOM + 0.95, p.y)
+              * (1.0 - smoothstep(BAR_BOTTOM + BAR_HEIGHT - 1.75, BAR_BOTTOM + BAR_HEIGHT - 1.0, p.y));
+  float prof = 1.0 - smoothstep(0.0, 0.15, dx);
+  return 0.065 * prof * prof * (3.0 - 2.0 * prof) * along;
 }
 
 // A pillow, not a box: faces very slightly domed towards the middle, rolling
 // over into the sides with a big soft radius (no flat bevel ledge).
-float sdFaluda(vec3 p) {
-  float o = faludaOutline(p.xy);
+float sdFaluda(vec3 p, bool coco) {
+  float o = faludaOutline(p.xy, coco);
   // smooth in x and y (a dome built from the outline distance would crease)
   vec2 e = vec2(p.x / FALUDA_W, (p.y - BAR_MID) / (BAR_HEIGHT * 0.5));
+  if (coco) {
+    // flatter faces, a tighter roll into the sides, and the two grooves
+    float t = FALUDA_T - 0.05 * e.x * e.x - 0.03 * e.y * e.y;
+    return (sdRoundedExtrusion(o, p.z, t, 0.6) + cocoGrooves(p.xy)) * 0.88;
+  }
   float t = FALUDA_T - 0.09 * e.x * e.x - 0.04 * e.y * e.y;
   return sdRoundedExtrusion(o, p.z, t, FALUDA_EDGE) * 0.97;
 }
@@ -172,8 +190,8 @@ float sdBlob(vec3 p) {
   return k0 * (k0 - 1.0) / max(k1, 1e-4);
 }
 
-float sdMelting(vec3 q, float morph, bool faluda) {
-  float a = faluda ? sdFaluda(q) : sdBar(q);
+float sdMelting(vec3 q, float morph, bool faluda, bool coco) {
+  float a = faluda ? sdFaluda(q, coco) : sdBar(q);
   if (morph <= 0.0) return a;
   return mix(a, sdBlob(q), morph);
 }
