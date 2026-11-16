@@ -129,14 +129,14 @@ body {
    each a round window onto that ice cream's own surface */
 
 .dock {
-  --orb: 30px;
+  --orb: 26px;
   position: fixed;
   left: max(calc(var(--backdrop-inset) + 36px), env(safe-area-inset-left));
-  bottom: max(calc(var(--backdrop-inset-bottom, var(--backdrop-inset)) + 39px), env(safe-area-inset-bottom));
+  bottom: max(calc(var(--backdrop-inset-bottom, var(--backdrop-inset)) + 41px), env(safe-area-inset-bottom));
   z-index: 2;
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
   opacity: 0;
   visibility: hidden;
   transition: opacity 900ms ease 400ms, visibility 0s 400ms;
@@ -251,8 +251,8 @@ body {
     font-size: 13px;
   }
   .dock {
-    --orb: 28px;
-    gap: 11px;
+    --orb: 24px;
+    gap: 10px;
   }
 }
 
