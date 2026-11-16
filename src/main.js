@@ -2,6 +2,7 @@ import "./styles.css";
 import { Renderer } from "./render/renderer.js";
 import { engravingCanvas } from "./render/engraving.js";
 import { CrackAudio } from "./audio/crack.js";
+import { WeatherAudio } from "./audio/weather.js";
 import { WeatherPicker } from "./ui/weather.js";
 import { Dock } from "./ui/dock.js";
 import { FLAVORS } from "./flavors.js";
@@ -15,6 +16,7 @@ const canvas = document.querySelector("#scene");
 const controls = document.querySelector(".controls");
 const weatherRoot = document.querySelector(".weather");
 const resetBtn = document.querySelector(".reset");
+const soundBtn = document.querySelector(".sound-toggle");
 const dockRoot = document.querySelector(".flavors");
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -32,6 +34,7 @@ try {
 }
 
 const audio = new CrackAudio();
+const ambience = new WeatherAudio(() => audio.ensure(), WEATHER_DEFAULT);
 const fracture = new Fracture();
 const liquid = new Liquid();
 
@@ -57,8 +60,25 @@ const weather = new WeatherPicker(weatherRoot, {
   onChange: (i) => {
     state.weather = i;
     audio.tick(0.8 + i * 0.15);
+    ambience.setWeather(i);
   },
 });
+
+// Browsers require a gesture before playing audio. Start with the current
+// weather on the first interaction, then follow the picker until muted.
+function startSound() {
+  if (!renderer || audio.muted) return;
+  ambience.enable();
+}
+window.addEventListener("pointerdown", startSound, { once: true });
+window.addEventListener("keydown", startSound, { once: true });
+soundBtn.addEventListener("click", () => {
+  audio.muted = !audio.muted;
+  soundBtn.setAttribute("aria-pressed", String(audio.muted));
+  soundBtn.title = audio.muted ? "Turn sounds on" : "Mute sounds";
+  ambience.setEnabled(!audio.muted);
+});
+document.addEventListener("visibilitychange", () => ambience.setHidden(document.hidden));
 
 // --------------------------------------------------------------- camera ----
 
