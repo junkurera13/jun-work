@@ -10,7 +10,7 @@ A blank white page with one Magic Choc vanilla ice cream on it.
   welling up through any cracks), then the chocolate softens. Drips run down the
   surface and the stick and fall off the bottom of the screen. Keep watching and the
   stick comes out.
-- The **weather buttons** at the bottom (❄️ 🌧️ ⛅ ☀️ 🔥) change the painted sky behind it and
+- The **weather words** along the top (snow · rain · breeze · sunshine · heatwave) change the painted sky behind it and
   how fast it melts: snow freezes it, brutal summer melts it in about a minute. ↺ gives you a new
   ice cream.
 
@@ -45,7 +45,7 @@ npm run build
 | `src/sim/liquid.js` | Rivulets, hanging drops, pinch-off and falling drops |
 | `src/audio/crack.js` | Procedural chocolate-snap sounds |
 | `src/shaders/background.glsl` | The painted weather backdrop that fades into the white page |
-| `src/ui/weather.js` | Weather buttons |
+| `src/ui/weather.js` | The line of weather words (and the sound toggle) |
 | `archive/` | The old portfolio |
 
 Run `__ice.setMelt(0.6)` or `__ice.setWeather(4)` in the console to jump around the melt.

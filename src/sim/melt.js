@@ -35,10 +35,10 @@ export function meltParams(P) {
 // The weather sets the melt speed (x the default pace) and tints the light
 // on the ice cream. Order matches the painted backdrops in background.glsl.
 export const WEATHERS = [
-  { id: "snow", icon: "\u2744\ufe0f", label: "Snowy", rate: 0, tint: [0.92, 0.96, 1.06] },
-  { id: "rain", icon: "\ud83c\udf27\ufe0f", label: "Rainy", rate: 0.4, tint: [0.88, 0.92, 0.98] },
-  { id: "normal", icon: "\u26c5", label: "Normal", rate: 1, tint: [1, 1, 1] },
-  { id: "summer", icon: "\u2600\ufe0f", label: "Summer", rate: 3, tint: [1.07, 1.01, 0.92] },
-  { id: "brutal", icon: "\ud83d\udd25", label: "Brutal summer", rate: 7, tint: [1.14, 0.99, 0.84] },
+  { id: "snow", icon: "\u2744\ufe0f", word: "snow", label: "Snow", rate: 0, tint: [0.92, 0.96, 1.06] },
+  { id: "rain", icon: "\ud83c\udf27\ufe0f", word: "rain", label: "Rain", rate: 0.4, tint: [0.88, 0.92, 0.98] },
+  { id: "normal", icon: "\u26c5", word: "breeze", label: "Breeze", rate: 1, tint: [1, 1, 1] },
+  { id: "summer", icon: "\u2600\ufe0f", word: "sunshine", label: "Sunshine", rate: 3, tint: [1.07, 1.01, 0.92] },
+  { id: "brutal", icon: "\ud83d\udd25", word: "heatwave", label: "Heatwave", rate: 7, tint: [1.14, 0.99, 0.84] },
 ];
 export const WEATHER_DEFAULT = 2;
