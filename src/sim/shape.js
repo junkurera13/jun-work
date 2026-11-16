@@ -4,7 +4,7 @@
 
 export const BAR_BOTTOM = -4.8;
 export const BAR_HEIGHT = 9.6;
-export const SHELL_T = 0.13;
+export const SHELL_T = 0.08;
 export const STICK_HW = 0.47;
 export const STICK_HT = 0.1;
 export const STICK_Y0 = -9.3;
@@ -93,30 +93,24 @@ export function sn3(x, y, z) {
   return 0.5 + 0.2 * a + 0.15 * b + 0.12 * c;
 }
 
-function sdTrapezoid(px, py, r1, r2, he) {
-  const k1x = r2;
-  const k1y = he;
-  const k2x = r2 - r1;
-  const k2y = 2 * he;
-  px = Math.abs(px);
-  const cax = px - Math.min(px, py < 0 ? r1 : r2);
-  const cay = Math.abs(py) - he;
-  const t = clamp(((k1x - px) * k2x + (k1y - py) * k2y) / (k2x * k2x + k2y * k2y), 0, 1);
-  const cbx = px - k1x + k2x * t;
-  const cby = py - k1y + k2y * t;
-  const s = cbx < 0 && cay < 0 ? -1 : 1;
-  return s * Math.sqrt(Math.min(cax * cax + cay * cay, cbx * cbx + cby * cby));
-}
-
+// Puffy egg-shaped paddle (superellipsoid / analytic gradient), mirrors common.glsl
 export function sdBar(x, y, z) {
-  const r = mix(0.62, 2.0, smoothstep(-0.8, 4.4, y));
-  const d2 = sdTrapezoid(x, y, 2.4 - r, 2.8 - r, 4.8 - r) - r;
-  const xn = clamp(x / 2.8, -1, 1);
-  const h = 0.93 + 0.11 * (1 - xn * xn) - 0.03 * smoothstep(0, 4.8, y);
-  const re = 0.66;
-  const wx = d2 + re;
-  const wy = Math.abs(z) - h + re;
-  return Math.min(Math.max(wx, wy), 0) + Math.hypot(Math.max(wx, 0), Math.max(wy, 0)) - re;
+  const a = mix(2.42, 2.86, smoothstep(-4.6, 1.8, y));
+  const b = 4.8;
+  const c = 1.2;
+  const n = 2.5;
+  const m = 2.6;
+  const sx = Math.max(Math.abs(x) / a, 1e-5);
+  const sy = Math.max(Math.abs(y) / b, 1e-5);
+  const sz = Math.max(Math.abs(z) / c, 1e-5);
+  const u = Math.pow(Math.pow(sx, n) + Math.pow(sy, n), 1 / n);
+  const f = Math.pow(Math.pow(u, m) + Math.pow(sz, m), 1 / m);
+  const fm = Math.pow(f, 1 - m);
+  const du = fm * Math.pow(u, m - 1) * Math.pow(u, 1 - n);
+  const gx = (du * Math.pow(sx, n - 1)) / a;
+  const gy = (du * Math.pow(sy, n - 1)) / b;
+  const gz = (fm * Math.pow(sz, m - 1)) / c;
+  return (f - 1) / Math.max(Math.hypot(gx, gy, gz), 1e-4);
 }
 
 export function sdBlob(x, y, z) {

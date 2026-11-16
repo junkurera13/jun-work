@@ -6,7 +6,7 @@
 
 const float BAR_BOTTOM = -4.8;
 const float BAR_HEIGHT = 9.6;
-const float SHELL_T = 0.13;      // chocolate shell thickness (1.3 mm)
+const float SHELL_T = 0.08;      // chocolate shell thickness (0.8 mm)
 
 const float STICK_HW = 0.47;     // half width
 const float STICK_HT = 0.1;      // half thickness
@@ -102,16 +102,23 @@ float sdRoundCone(vec3 p, vec3 a, vec3 b, float r1, float r2) {
   return (sqrt(x2 * a2 * il2) + y * rr) * il2 - r1;
 }
 
-// The undeformed Magic Choc bar: a paddle shaped slab, slightly wider at the
-// top with big rounded shoulders, gently domed faces and soft rounded edges.
+// The undeformed bar: a soft, puffy egg-shaped paddle. The outline is a
+// rounded oval (a superellipse, fuller towards the top), and the cross
+// section is a pillow: broad domed faces melting into fully rounded edges.
+// Distance = superellipsoid value / its analytic gradient.
 float sdBar(vec3 p) {
-  float r = mix(0.62, 2.0, smoothstep(-0.8, 4.4, p.y));
-  float d2 = sdTrapezoid(p.xy, 2.4 - r, 2.8 - r, 4.8 - r) - r;
-  float xn = clamp(p.x / 2.8, -1.0, 1.0);
-  float h = 0.93 + 0.11 * (1.0 - xn * xn) - 0.03 * smoothstep(0.0, 4.8, p.y);
-  float re = 0.66;
-  vec2 w = vec2(d2 + re, abs(p.z) - h + re);
-  return min(max(w.x, w.y), 0.0) + length(max(w, 0.0)) - re;
+  float a = mix(2.42, 2.86, smoothstep(-4.6, 1.8, p.y));
+  const float b = 4.8;
+  const float c = 1.2;
+  const float n = 2.5;
+  const float m = 2.6;
+  vec3 s = max(vec3(abs(p.x) / a, abs(p.y) / b, abs(p.z) / c), vec3(1e-5));
+  float u = pow(pow(s.x, n) + pow(s.y, n), 1.0 / n);
+  float f = pow(pow(u, m) + pow(s.z, m), 1.0 / m);
+  float fm = pow(f, 1.0 - m);
+  float du = fm * pow(u, m - 1.0) * pow(u, 1.0 - n);
+  vec3 g = vec3(du * pow(s.x, n - 1.0) / a, du * pow(s.y, n - 1.0) / b, fm * pow(s.z, m - 1.0) / c);
+  return (f - 1.0) / max(length(g), 1e-4);
 }
 
 // The shape a melting bar slumps towards: a soft rounded lump.

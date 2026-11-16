@@ -114,7 +114,7 @@ export class Fracture {
       const Rt = imp.R0 * (0.7 + 0.45 * Math.min(imp.strength, 1.6));
       imp.R += (Rt - imp.R) * Math.min(1, dt * 18);
       // the crater sinks on a slightly bouncy spring: squish, settle
-      const dT = Math.min(0.065, 0.03 * imp.strength + 0.008);
+      const dT = Math.min(0.045, 0.02 * imp.strength + 0.006);
       // (sub-stepped so a slow frame can never make it blow up)
       const steps = Math.ceil(dt / 0.006);
       const h = dt / steps;

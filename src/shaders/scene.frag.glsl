@@ -147,7 +147,7 @@ float crackField(vec3 q, out float sink, out float fill, out float inHole, out f
       float lat = r * sin(ada);
       float along = r * cos(ada);
       float dist = along < L ? lat : length(vec2(along - L, lat));
-      float w = 0.034 * pow(clamp(1.0 - r / L, 0.0, 1.0), 0.65) * min(1.0, C.x * 1.6);
+      float w = 0.024 * pow(clamp(1.0 - r / L, 0.0, 1.0), 0.65) * min(1.0, C.x * 1.6);
       float g = dist - w * (0.45 + 1.1 * jag) - 0.004 * jag2;
       if (g < best) {
         best = g;
@@ -169,7 +169,7 @@ float crackField(vec3 q, out float sink, out float fill, out float inHole, out f
       if (!present) continue;
       rings += 1.0;
       if (r > rho) { zone += 1.0; zoneR0 = rho; }
-      float w = 0.024 * (1.0 - rho / R) * min(1.0, C.x);
+      float w = 0.017 * (1.0 - rho / R) * min(1.0, C.x);
       float g = abs(r - rho) - w * (0.4 + 1.2 * jag) - 0.004 * jag2;
       best = min(best, g);
     }
@@ -562,7 +562,7 @@ vec3 shade(vec3 p, vec3 rd, float pix) {
     // body (shell / core), stick, liquid blend
     Mat bm;
     if (P.shell <= P.core) {
-      if (P.outer + P.sink < -0.012) {
+      if (P.outer + P.sink < -0.008) {
         bm = fracture();
         bumpAmp = 0.45; bumpFreq = 32.0;
       } else {
