@@ -70,8 +70,10 @@ export class Liquid {
     // passionfruit coconut: coconut milk (0) runs off the bottom and down the
     // stick; the passionfruit on top (1) runs from the upper faces
     if (this.mould === 1) for (const src of s) src.mat = src.kind === "face" && src.y > 1.6 ? 1 : 0;
-    // strawberry milk: it's all the one pink milk ice
-    if (this.mould === 2) for (const src of s) src.mat = 0;
+    // strawberry milk, mint choc: it's all the one cream
+    if (this.mould >= 2) for (const src of s) src.mat = 0;
+    // mint choc: a slim tube, so the melt sources sit closer in
+    if (this.mould === 3) for (const src of s) if (src.kind !== "stick") src.x *= 0.5;
     this.sources = s;
   }
 

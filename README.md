@@ -7,6 +7,8 @@ And a strawberry milk ice pop: a tapered wedge of soft pink milk ice freckled wi
 doesn't crack; pressing it leaves soft dents, like firm frozen ice cream.
 The last is the Magic Choc bar again, dipped in white chocolate, with blueberry yoghurt ice cream inside:
 creamy white rippled with purple compote and blueberry pieces.
+And a mint choc pop: a slim cylinder of soft mint cream with chocolate chips, dusted with cookie crumbs and
+crusted with chopped cookie round the bottom. Like the strawberry one, it dents instead of cracking.
 Use the flavor buttons below the scene to switch between them.
 
 - **Tap / click** the shell to break it: a patch around your finger snaps into

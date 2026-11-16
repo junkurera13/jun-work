@@ -14,6 +14,7 @@ uniform float uTime;
 uniform bool uFaluda;
 uniform bool uCoco;      // passionfruit coconut: grooved lolly mould, coconut ice under passionfruit
 uniform bool uWhite;     // white chocolate shell over blueberry yoghurt ice cream (Magic Choc shape)
+uniform bool uMint;      // mint choc: a slim cylinder of mint cream with cookie crumbs
 uniform bool uBerry;     // strawberry milk: tapered wedge mould, pink milk ice with crushed berries
 uniform bool uThumb;      // picker icon: no backdrop, coverage goes to alpha
 
@@ -51,7 +52,9 @@ uniform float uExposure;
 #include "common.glsl"
 #include "background.glsl"
 
-int lollyMould() { return uCoco ? MOULD_COCO : (uBerry ? MOULD_BERRY : MOULD_FALUDA); }
+int lollyMould() { return uCoco ? MOULD_COCO : (uBerry ? MOULD_BERRY : (uMint ? MOULD_MINT : MOULD_FALUDA)); }
+// the creamy pops (strawberry milk, mint choc) never crack: a press leaves a dent
+bool softLolly() { return uBerry || uMint; }
 
 uniform vec3 uLightTint; // the weather tints the light on the ice cream
 
@@ -114,6 +117,8 @@ float bodyOuter(vec3 p, out vec3 q, out float hn) {
 // as a fraction of the way around: the texture repeats, so there's no seam.
 float crackS(vec3 q) {
   float y = q.y;
+  // the mint tube is round: just the angle around it
+  if (uMint) return atan(q.x, q.z) / 6.2831853;
   if (uFaluda) {
     float w = lollyHalfWidth(y, lollyMould());
     float th = lollyHalfThick(y, lollyMould());
@@ -138,7 +143,7 @@ float crackS(vec3 q) {
 float crackField(vec3 q, out float sink, out float fill, out float inHole, out float holeEdge,
                  out float recess, out float gapAO, out float sinkCore, out vec2 nearOut) {
   vec2 uv = vec2(crackS(q) + 0.5, (6.1 - q.y) / 11.52);
-  if (uBerry) {
+  if (softLolly()) {
     // The milk lolly never cracks: the texture only holds dents (B). Read a
     // slightly blurred copy so the 8-bit steps don't show as rings, and let
     // repeated presses deepen with diminishing returns so a dent can never
@@ -171,7 +176,7 @@ float crackField(vec3 q, out float sink, out float fill, out float inHole, out f
   float rim = SHELL_T * 1.2 * smoothstep(0.0, 0.7, near) * slump;
   // pushed-in plates level out too, so no steps are left behind
   // (the milk lolly takes deep, soft dents instead of shallow pushed-in plates)
-  float pushK = uBerry ? 0.55 : 0.13;
+  float pushK = softLolly() ? 0.55 : 0.13;
   sink = t.b * pushK * mix(1.0, 0.5, soft) * (1.0 - slump) + lip + rim;
   // the ice cream under the shell follows the plates only softly, so popped
   // neighbouring chips leave one smooth vanilla surface, not steps
@@ -266,7 +271,7 @@ void bodyEval(vec3 p, inout Parts P) {
     float keep = g - uChocGone;
     dShell = max(dShell, -keep * 0.45);
   }
-  if (uBerry) {
+  if (softLolly()) {
     // dents tilt the surface, so step the ray marcher a little more carefully
     dShell *= 0.8;
     dCore *= 0.8;
@@ -798,7 +803,79 @@ Mat berryMilk(vec3 p, vec3 q, float melt, bool inner) {
   return m;
 }
 
+// ---------------------------------------------------------- mint choc ----
+// Mint ice cream frozen soft and creamy: a pale pistachio-mint, matte, with
+// the odd chocolate chip pocket showing at the surface, a patchy dusting of
+// chocolate cookie crumbs, and the bottom end packed with chopped cookie.
+// Reference space, so it all stays put as it melts and dents.
+// inner: under the surface (no frost).
+// Chocolate chips folded through the mint: little flattened lumps scattered
+// at random through the cream. Where the surface cuts through one, it shows.
+// x = chip, y = the thin cream just over/around one (a soft shadow).
+vec2 mintChips(vec3 q) {
+  const float CELL = 1.05;
+  vec3 ci = floor(q / CELL);
+  float chip = 0.0;
+  float rim = 0.0;
+  for (int k = 0; k < 27; k++) {
+    vec3 c = ci + vec3(float(k % 3), float((k / 3) % 3), float(k / 9)) - 1.0;
+    vec3 h = hash33(c + 41.0);
+    if (h.x > 0.3) continue;
+    vec3 ctr = (c + 0.2 + 0.6 * hash33(c * 1.3 + 7.0)) * CELL;
+    vec3 v = q - ctr;
+    // flattened and turned at random, with a lumpy edge
+    vec3 a = normalize(hash33(c * 2.9 + 5.0) - 0.5);
+    float along = dot(v, a);
+    float r = (0.16 + 0.12 * h.y) * (0.85 + 0.3 * vnoise3(q * 9.0 + c));
+    float d = length(v + a * along * 0.8) / r;
+    chip = max(chip, 1.0 - smoothstep(0.92, 1.0, d));
+    rim = max(rim, (1.0 - smoothstep(1.0, 1.5, d)) * smoothstep(0.92, 1.0, d));
+  }
+  return vec2(chip, rim);
+}
+
+Mat mintCream(vec3 p, vec3 q, float melt, bool inner) {
+  Mat m;
+  float thaw = smoothstep(0.0, 0.5, melt);
+  float cloud = sn3(q * vec3(1.4, 0.6, 1.4) + vec3(3.0, 8.0, 5.0));
+  vec3 c = mix(srgb(vec3(0.66, 0.81, 0.45)), srgb(vec3(0.74, 0.86, 0.54)), clamp(cloud + 0.3 * (vnoise3(q * 5.0 + 2.0) - 0.5), 0.0, 1.0));
+  // chocolate chips folded through: sparse dark pockets, a soft green shadow
+  // round each where the cream is thin over it
+  vec2 ch = mintChips(q);
+  float chip = ch.x;
+  c = mix(c, c * srgb(vec3(0.78, 0.84, 0.7)), 0.55 * ch.y);
+  c = mix(c, srgb(vec3(0.16, 0.1, 0.075)), chip);
+  // cookie crumbs dusted over it, thicker in patches
+  float patchy = smoothstep(0.35, 0.72, sn3(q * 1.1 + 4.0));
+  // (two scales blended so the bits are ragged, not blocky)
+  float cf = vnoise3(q * 13.0 + 5.0) * 0.55 + vnoise3(q * 31.0 + 9.0) * 0.45;
+  float crumbs = smoothstep(mix(0.81, 0.72, patchy), mix(0.84, 0.75, patchy), cf);
+  crumbs = clamp(crumbs * (inner ? 0.5 : 1.0), 0.0, 1.0);
+  vec3 cookie = mix(srgb(vec3(0.08, 0.065, 0.06)), srgb(vec3(0.24, 0.16, 0.11)), vnoise3(q * 40.0 + 3.0) * 0.8);
+  c = mix(c, cookie, crumbs);
+  // the crust of chopped cookie round the bottom, mint peeking between chunks
+  float crust = mintCrustMask(q);
+  float chunk = smoothstep(0.3, 0.6, vnoise3(q * 6.0 + 3.0) * 0.7 + vnoise3(q * 14.0 + 1.0) * 0.3);
+  float crustK = crust * mix(0.45, 1.0, chunk);
+  vec3 crustCol = mix(srgb(vec3(0.08, 0.065, 0.065)), srgb(vec3(0.22, 0.15, 0.11)), vnoise3(q * 22.0 + 6.0) * 0.8);
+  c = mix(c, crustCol, crustK);
+  float frost = inner ? 0.0 : (1.0 - thaw) * mix(0.5, 1.0, sn3(p * 2.2 + 6.0));
+  c = mix(c, srgb(vec3(0.93, 0.97, 0.88)), 0.2 * frost * (1.0 - max(crumbs, crustK)));
+  c = mix(c, c * vec3(0.97, 0.98, 0.95), thaw * 0.4);
+  m.albedo = c;
+  float rough = mix(0.6, 0.13, thaw);
+  rough = mix(rough, 0.35, chip);
+  rough = mix(rough, 0.8, max(crumbs, crustK) * (1.0 - thaw * 0.6));
+  m.rough = rough;
+  m.sss = mix(0.5, 0.75, thaw) * (1.0 - 0.8 * max(max(chip, crumbs), crustK));
+  m.sssCol = srgb(vec3(0.85, 1.0, 0.75));
+  m.spec = mix(0.55, 1.0, thaw);
+  m.sheen = inner ? 0.0 : 0.15 * frost * (1.0 - crustK);
+  return m;
+}
+
 Mat shellMaterial(vec3 p, vec3 q, vec3 n, float melt) {
+  if (uMint) return mintCream(p, q, melt, false);
   if (uBerry) return berryMilk(p, q, melt, false);
   if (uCoco) return cocoIce(p, q, n, melt, false);
   if (uFaluda) return faludaIce(p, q, melt);
@@ -865,6 +942,10 @@ Mat creamCore(vec3 q, float melt) {
 
 Mat fracture() {
   Mat m;
+  if (uMint) {
+    m = mintCream(vec3(0.0), vec3(0.0), 0.0, true);
+    return m;
+  }
   if (uWhite) {
     // freshly snapped white chocolate: matte, creamy and a touch paler
     m.albedo = srgb(vec3(0.94, 0.89, 0.77));
@@ -958,17 +1039,18 @@ vec3 shade(vec3 p, vec3 rd, float pix) {
     else if (P.fragSide < 1.5) { m = fracture(); bumpAmp = 0.5; bumpFreq = 30.0; }
     else if (uCoco) { m = cocoIce(p, P.q, n, uMeltC, true); bumpAmp = 0.2; bumpFreq = 22.0; }
     else if (uBerry) { m = berryMilk(p, P.q, uMeltC, true); bumpAmp = 0.2; bumpFreq = 22.0; }
+    else if (uMint) { m = mintCream(p, P.q, uMeltC, true); bumpAmp = 0.2; bumpFreq = 22.0; }
     else { m = creamCore(P.q, 0.1); m.albedo *= 0.96; bumpAmp = 0.35; bumpFreq = 22.0; }
   } else if (P.crumb <= best + 1e-5) {
     m = fracture();
-    m.albedo = mix(m.albedo, srgb(uWhite ? vec3(0.93, 0.88, 0.75) : uBerry ? vec3(0.93, 0.6, 0.59) : uCoco ? vec3(0.95, 0.94, 0.9) : uFaluda ? vec3(0.91, 0.17, 0.47) : vec3(0.36, 0.2, 0.11)), 0.5);
+    m.albedo = mix(m.albedo, srgb(uMint ? vec3(0.82, 0.89, 0.66) : uWhite ? vec3(0.93, 0.88, 0.75) : uBerry ? vec3(0.93, 0.6, 0.59) : uCoco ? vec3(0.95, 0.94, 0.9) : uFaluda ? vec3(0.91, 0.17, 0.47) : vec3(0.36, 0.2, 0.11)), 0.5);
     bumpAmp = 0.5; bumpFreq = 25.0;
   } else {
     // body (shell / core), stick, liquid blend
     Mat bm;
     if (P.shell <= P.core) {
       // (the milk lolly never breaks, so it has no raw broken edges)
-      if (P.outer + P.sink < -0.008 && !uBerry) {
+      if (P.outer + P.sink < -0.008 && !softLolly()) {
         // raw broken edge when frozen; melted, it's just the soft shell again
         // (chocolate, or wet ice: never chocolate under the faluda's rose ice)
         float slumpS = smoothstep(0.2, 0.55, uMeltC);
@@ -981,15 +1063,15 @@ vec3 shade(vec3 p, vec3 rd, float pix) {
       } else {
         bm = shellMaterial(p, P.q, n, chocLocal);
         bumpAmp = mix(0.05, 0.03, chocLocal); bumpFreq = 1.15;
-        bumpAmp2 = (uBerry ? 0.05 : uFaluda ? 0.035 : 0.008) * (1.0 - chocLocal); bumpFreq2 = 46.0;
-        if (uBerry) {
+        bumpAmp2 = (softLolly() ? 0.05 : uFaluda ? 0.035 : 0.008) * (1.0 - chocLocal); bumpFreq2 = 46.0;
+        if (softLolly()) {
           // where a finger pressed, the surface is smoothed and a bit glossy
           float pressed = smoothstep(0.02, 0.15, P.sink);
           bumpAmp2 *= 1.0 - 0.8 * pressed;
           bm.rough = mix(bm.rough, 0.3, 0.6 * pressed);
           bm.sheen *= 1.0 - pressed;
         }
-        if (uFaluda && !uBerry) {
+        if (uFaluda && !softLolly()) {
           // ice turns white around a break (stress crazing)
           float craze = smoothstep(0.03, 0.4, P.cnear) * (1.0 - chocLocal);
           bm.albedo = mix(bm.albedo, srgb(uCoco ? vec3(1.0, 1.0, 0.98) : vec3(1.0, 0.8, 0.87)), 0.5 * craze);
@@ -997,6 +1079,10 @@ vec3 shade(vec3 p, vec3 rd, float pix) {
           bm.sheen += 0.4 * craze;
         }
       }
+    } else if (uMint) {
+      // solid mint cream all the way through
+      bm = mintCream(p, P.q, chocLocal, true);
+      bumpAmp = mix(0.15, 0.03, chocLocal); bumpFreq = 21.0;
     } else if (uBerry) {
       // solid strawberry milk all the way through
       bm = berryMilk(p, P.q, chocLocal, true);
@@ -1029,9 +1115,9 @@ vec3 shade(vec3 p, vec3 rd, float pix) {
     seedBump *= 1.0 - wl;
     if (wl > 0.0) {
       Mat lv = vanilla(1.0);
-      lv.albedo = srgb(uWhite ? vec3(0.86, 0.77, 0.88) : uBerry ? vec3(0.95, 0.66, 0.65) : uCoco ? vec3(0.97, 0.96, 0.92) : uFaluda ? vec3(0.98, 0.76, 0.8) : vec3(0.99, 0.9, 0.66));
+      lv.albedo = srgb(uMint ? vec3(0.83, 0.9, 0.7) : uWhite ? vec3(0.86, 0.77, 0.88) : uBerry ? vec3(0.95, 0.66, 0.65) : uCoco ? vec3(0.97, 0.96, 0.92) : uFaluda ? vec3(0.98, 0.76, 0.8) : vec3(0.99, 0.9, 0.66));
       Mat lc = shellMaterial(p, P.q, n, 1.0);
-      lc.albedo = srgb(uWhite ? vec3(0.96, 0.91, 0.79) : uBerry ? vec3(0.95, 0.66, 0.65) : uCoco ? vec3(0.97, 0.56, 0.03) : uFaluda ? vec3(0.84, 0.1, 0.34) : vec3(0.4, 0.235, 0.135));
+      lc.albedo = srgb(uMint ? vec3(0.83, 0.9, 0.7) : uWhite ? vec3(0.96, 0.91, 0.79) : uBerry ? vec3(0.95, 0.66, 0.65) : uCoco ? vec3(0.97, 0.56, 0.03) : uFaluda ? vec3(0.84, 0.1, 0.34) : vec3(0.4, 0.235, 0.135));
       lc.rough = 0.08;
       Mat lm = mixMat(lv, lc, P.liqC);
       lm.rough = 0.07;
@@ -1088,7 +1174,7 @@ vec3 shade(vec3 p, vec3 rd, float pix) {
   // frost: a pale velvety glow where the surface turns away from you
   if (m.sheen > 0.0) {
     float graze = pow(1.0 - NoV, 2.5);
-    col += m.sheen * srgb(uBerry ? vec3(1.0, 0.9, 0.9) : uCoco ? vec3(1.0, 0.99, 0.97) : vec3(1.0, 0.86, 0.91)) * graze
+    col += m.sheen * srgb(uMint ? vec3(0.95, 1.0, 0.92) : uBerry ? vec3(1.0, 0.9, 0.9) : uCoco ? vec3(1.0, 0.99, 0.97) : vec3(1.0, 0.86, 0.91)) * graze
          * (envIrr(nW) * ao * 0.45 + keyCol * clamp(NoL + 0.3, 0.0, 1.0) * mix(sh, 1.0, 0.4) * 0.22);
   }
   return col;

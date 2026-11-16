@@ -61,4 +61,17 @@ export const FLAVORS = [
     swatch: { x: 0.9, y: -1.4, half: 1.4, peel: true },
     label: "A white chocolate bar with blueberry yoghurt ice cream inside. Tap it to crack the shell.",
   },
+  {
+    id: "mint-choc",
+    name: "mint choc",
+    // a slim cylinder of soft mint cream, dusted with chocolate cookie crumbs
+    // and crusted with chopped cookie round the bottom. Like the strawberry
+    // milk pop it doesn't crack: pressing it leaves a soft dent
+    faluda: true,
+    mould: 3,
+    soft: true,
+    shell: "soft",
+    swatch: { x: 0.0, y: 0.6, half: 1.2 },
+    label: "A mint chocolate cookie ice pop, a slim cylinder of mint cream. Press it to leave a soft dent.",
+  },
 ];

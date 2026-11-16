@@ -124,7 +124,9 @@ export function sdBar(x, y, z) {
 }
 
 // Lolly moulds sharing the faluda's flat stick (mirror common.glsl)
-export const MOULD = { FALUDA: 0, COCO: 1, BERRY: 2 };
+export const MOULD = { FALUDA: 0, COCO: 1, BERRY: 2, MINT: 3 };
+const MINT_R = 1.38;
+const MINT_RB = 0.32;
 const BERRY_W0 = 2.85; // wide at the stick end
 const BERRY_W1 = 1.32; // narrow at the tip
 const BERRY_RC = 0.5;
@@ -179,7 +181,22 @@ function lollyHalfThick(y, mould) {
   return FALUDA_T;
 }
 
+function mintCrust(x, y, z) {
+  const edge =
+    BAR_BOTTOM + 0.62 + 0.22 * (sn3(Math.atan2(x, z) * 2, 0, 1.7) - 0.5) + 0.12 * (vnoise3(x * 3, y * 3, z * 3) - 0.5);
+  const m = 1 - smoothstep(edge - 0.08, edge + 0.08, y);
+  if (m <= 0) return 0;
+  return m * 0.1 * smoothstep(0.3, 0.75, vnoise3(x * 6 + 3, y * 6 + 3, z * 6 + 3) * 0.7 + vnoise3(x * 14 + 1, y * 14 + 1, z * 14 + 1) * 0.3);
+}
+
+function sdMintTube(x, y, z) {
+  const dx = Math.hypot(x, z) - MINT_R + MINT_RB;
+  const dy = Math.abs(y - BAR_MID) - BAR_HEIGHT / 2 + MINT_RB;
+  return Math.hypot(Math.max(dx, 0), Math.max(dy, 0)) + Math.min(Math.max(dx, dy), 0) - MINT_RB;
+}
+
 export function sdFaluda(x, y, z, mould = MOULD.FALUDA) {
+  if (mould === MOULD.MINT) return (sdMintTube(x, y, z) - mintCrust(x, y, z)) * 0.85;
   if (mould === MOULD.BERRY) {
     const ob = trapezoid(x, y - BAR_MID, BERRY_W0 - BERRY_RC, BERRY_W1 - BERRY_RC, BAR_HEIGHT / 2 - BERRY_RC) - BERRY_RC;
     const s = clamp((y - BAR_BOTTOM) / BAR_HEIGHT, 0, 1);
@@ -207,10 +224,20 @@ export function sdBlob(x, y, z) {
   return (k0 * (k0 - 1)) / Math.max(k1, 1e-4);
 }
 
+function sdBlobSlim(x, y, z) {
+  const cx = x / 1.45;
+  const cy = (y - 0.1) / 4.9;
+  const cz = z / 1.45;
+  const k0 = Math.hypot(cx, cy, cz);
+  const k1 = Math.hypot(cx / 1.45, cy / 4.9, cz / 1.45);
+  return (k0 * (k0 - 1)) / Math.max(k1, 1e-4);
+}
+
 export function sdMelting(x, y, z, morph, faluda, mould = MOULD.FALUDA) {
   const a = faluda ? sdFaluda(x, y, z, mould) : sdBar(x, y, z);
   if (!(morph > 0)) return a;
-  return a + (sdBlob(x, y, z) - a) * morph;
+  const blob = faluda && mould === MOULD.MINT ? sdBlobSlim(x, y, z) : sdBlob(x, y, z);
+  return a + (blob - a) * morph;
 }
 
 /** Map an object-space point to the undeformed reference bar (q-space). */
@@ -277,6 +304,8 @@ export function sdStick(x, y, z, faluda) {
 
 /** Cross-section of the undeformed bar at height y: half width W, half thickness T. */
 export function crossSection(y, faluda, mould = MOULD.FALUDA) {
+  // the mint tube is round: the chart is simply the angle around it
+  if (faluda && mould === MOULD.MINT) return { W: MINT_R, T: MINT_R, R: MINT_R };
   if (faluda) {
     const radius = faludaCorner(y, mould);
     const dy = Math.max(0, Math.abs(y - BAR_MID) - BAR_HEIGHT / 2 + radius);
@@ -296,6 +325,7 @@ export function crossSection(y, faluda, mould = MOULD.FALUDA) {
 /** Reference-space point -> chart (u, y). */
 export function toChart(x, y, z, faluda, mould = MOULD.FALUDA) {
   const c = crossSection(y, faluda, mould);
+  if (faluda && mould === MOULD.MINT) return { u: MINT_R * Math.atan2(x, z), y, R: MINT_R };
   if (faluda) {
     // Project onto the box perimeter so fractures keep their proportions on the flat faces.
     const nx = Math.abs(x) / c.W;
@@ -311,6 +341,10 @@ export function toChart(x, y, z, faluda, mould = MOULD.FALUDA) {
 /** Chart (u, y) -> reference-space surface direction (x on the surface, side +1 front / -1 back). */
 export function fromChart(u, y, faluda, mould = MOULD.FALUDA) {
   const c = crossSection(y, faluda, mould);
+  if (faluda && mould === MOULD.MINT) {
+    const phi = u / MINT_R;
+    return { x: MINT_R * Math.sin(phi), z: MINT_R * Math.cos(phi), side: Math.cos(phi) >= 0 ? 1 : -1 };
+  }
   if (faluda) {
     const half = Math.PI * c.R;
     const wrapped = ((u + half) % (2 * half) + 2 * half) % (2 * half) - half;

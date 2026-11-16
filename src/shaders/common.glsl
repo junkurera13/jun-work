@@ -137,6 +137,29 @@ float sdBar(vec3 p) {
 const int MOULD_FALUDA = 0;  // soft pillow, almost-round top
 const int MOULD_COCO = 1;    // boxier, two grooves down each face
 const int MOULD_BERRY = 2;   // tapered wedge: wide at the stick, narrowing to the tip
+const int MOULD_MINT = 3;    // a thin cylinder, its bottom end crusted with cookie crumbs
+
+// Mint choc mould: a slim round tube with softly rounded ends.
+const float MINT_R = 1.38;   // radius
+const float MINT_RB = 0.32;  // edge rounding at the ends
+
+// The mint pop's bottom end is packed with chopped chocolate cookie: a
+// ragged band (0..1) around the base where the crumbs are stuck on.
+float mintCrustMask(vec3 p) {
+  float edge = BAR_BOTTOM + 0.62 + 0.22 * (sn3(vec3(atan(p.x, p.z) * 2.0, 0.0, 1.7)) - 0.5) + 0.12 * (vnoise3(p * 3.0) - 0.5);
+  return 1.0 - smoothstep(edge - 0.08, edge + 0.08, p.y);
+}
+// ...and the crumbs stand proud of the surface there: lumpy bits.
+float mintCrust(vec3 p) {
+  float m = mintCrustMask(p);
+  if (m <= 0.0) return 0.0;
+  return m * 0.1 * smoothstep(0.3, 0.75, vnoise3(p * 6.0 + 3.0) * 0.7 + vnoise3(p * 14.0 + 1.0) * 0.3);
+}
+
+float sdMintTube(vec3 p) {
+  vec2 d = vec2(length(p.xz) - MINT_R + MINT_RB, abs(p.y - BAR_MID) - BAR_HEIGHT * 0.5 + MINT_RB);
+  return length(max(d, 0.0)) + min(max(d.x, d.y), 0.0) - MINT_RB;
+}
 
 // Strawberry milk mould: a tapered wedge, wide and thick at the stick end,
 // narrowing to the tip, with a soft ridge down the middle of each face.
@@ -201,6 +224,7 @@ float cocoGrooves(vec2 p) {
 // A pillow, not a box: faces very slightly domed towards the middle, rolling
 // over into the sides with a big soft radius (no flat bevel ledge).
 float sdFaluda(vec3 p, int mould) {
+  if (mould == MOULD_MINT) return (sdMintTube(p) - mintCrust(p)) * 0.85;
   float o = faludaOutline(p.xy, mould);
   if (mould == MOULD_BERRY) {
     // each face rises gently to a soft ridge down the middle
@@ -230,9 +254,18 @@ float sdBlob(vec3 p) {
   return k0 * (k0 - 1.0) / max(k1, 1e-4);
 }
 
+// a slimmer lump for the thin mint tube, so it doesn't swell as it slumps
+float sdBlobSlim(vec3 p) {
+  vec3 c = p - vec3(0.0, 0.1, 0.0);
+  vec3 r = vec3(1.45, 4.9, 1.45);
+  float k0 = length(c / r);
+  float k1 = length(c / (r * r));
+  return k0 * (k0 - 1.0) / max(k1, 1e-4);
+}
+
 float sdMelting(vec3 q, float morph, bool faluda, int mould) {
   float a = faluda ? sdFaluda(q, mould) : sdBar(q);
   if (morph <= 0.0) return a;
-  return mix(a, sdBlob(q), morph);
+  return mix(a, faluda && mould == MOULD_MINT ? sdBlobSlim(q) : sdBlob(q), morph);
 }
 
