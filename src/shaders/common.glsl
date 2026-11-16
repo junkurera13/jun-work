@@ -16,6 +16,14 @@ const float STICK_Y0 = -9.5;     // bottom extreme
 const float STICK_Y1 = 0.0;      // top extreme (inside the bar): mirror of the bottom end
 const float STICK_WAIST_Y = -4.75; // narrowest point: right where it leaves the ice cream
 
+// Faluda popsicle: a slab of rose ice around a vanilla ice cream centre.
+// Dimensions mirror src/sim/shape.js.
+const float FALUDA_W = 2.62;      // half width
+const float FALUDA_T = 1.02;      // half thickness at the middle of the faces
+const float FALUDA_EDGE = 0.78;   // radius the faces roll over into the sides with
+const float FALUDA_SHELL = 0.46;  // ice wall around the vanilla centre
+const float FALUDA_STICK_W = 0.52; // a classic flat stick, round-ended
+
 float hash12(vec2 p) {
   vec3 p3 = fract(vec3(p.xyx) * 0.1031);
   p3 += dot(p3, p3.yzx + 33.33);
@@ -125,6 +133,36 @@ float sdBar(vec3 p) {
   return (f - 1.0) / max(length(g), 1e-4);
 }
 
+// Outline corner radius: a generous, almost-round top and small squared-off
+// shoulders at the bottom where it was poured into the mould.
+float faludaCorner(float y) {
+  return mix(0.8, 2.05, smoothstep(BAR_MID - 1.0, BAR_MID + 1.0, y));
+}
+
+float sdRoundedRect(vec2 p, vec2 halfSize, float radius) {
+  vec2 d = abs(p) - halfSize + radius;
+  return length(max(d, 0.0)) + min(max(d.x, d.y), 0.0) - radius;
+}
+
+float sdRoundedExtrusion(float profile, float z, float thickness, float bevel) {
+  vec2 d = vec2(profile, abs(z) - thickness) + bevel;
+  return length(max(d, 0.0)) + min(max(d.x, d.y), 0.0) - bevel;
+}
+
+float faludaOutline(vec2 p) {
+  return sdRoundedRect(p - vec2(0.0, BAR_MID), vec2(FALUDA_W, BAR_HEIGHT * 0.5), faludaCorner(p.y));
+}
+
+// A pillow, not a box: faces very slightly domed towards the middle, rolling
+// over into the sides with a big soft radius (no flat bevel ledge).
+float sdFaluda(vec3 p) {
+  float o = faludaOutline(p.xy);
+  // smooth in x and y (a dome built from the outline distance would crease)
+  vec2 e = vec2(p.x / FALUDA_W, (p.y - BAR_MID) / (BAR_HEIGHT * 0.5));
+  float t = FALUDA_T - 0.09 * e.x * e.x - 0.04 * e.y * e.y;
+  return sdRoundedExtrusion(o, p.z, t, FALUDA_EDGE) * 0.97;
+}
+
 // The shape a melting bar slumps towards: a soft rounded lump.
 float sdBlob(vec3 p) {
   vec3 c = p - vec3(0.0, 0.1, 0.0);
@@ -134,8 +172,8 @@ float sdBlob(vec3 p) {
   return k0 * (k0 - 1.0) / max(k1, 1e-4);
 }
 
-float sdMelting(vec3 q, float morph) {
-  float a = sdBar(q);
+float sdMelting(vec3 q, float morph, bool faluda) {
+  float a = faluda ? sdFaluda(q) : sdBar(q);
   if (morph <= 0.0) return a;
   return mix(a, sdBlob(q), morph);
 }

@@ -1,4 +1,4 @@
-// Procedural ASMR chocolate-shell sounds. Everything is synthesised with
+// Procedural ASMR shell sounds (chocolate, and the faluda's rose ice). Everything is synthesised with
 // WebAudio so every snap is slightly different, like the real thing:
 // a sharp brittle transient, the woody "tock" of the shell, a short spray of
 // micro-crackles as the fracture runs, and a soft creamy undertone.
@@ -9,6 +9,7 @@ export class CrackAudio {
   constructor() {
     this.ctx = null;
     this.muted = false;
+    this.material = "choc"; // "choc" | "ice": which shell is being cracked
   }
 
   ensure() {
@@ -107,7 +108,24 @@ export class CrackAudio {
     o.stop(t + decay + 0.02);
   }
 
+  /** a clear, slightly glassy partial: ice rings where chocolate thuds */
+  ping(dest, t, freq, gain, decay) {
+    const ctx = this.ctx;
+    const o = ctx.createOscillator();
+    o.type = "sine";
+    o.frequency.setValueAtTime(freq * 1.04, t);
+    o.frequency.exponentialRampToValueAtTime(freq, t + 0.006);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(gain, t + 0.0008);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + decay);
+    o.connect(g).connect(dest);
+    o.start(t);
+    o.stop(t + decay + 0.02);
+  }
+
   crack(kind = "crack", pan = 0, strength = 1) {
+    if (this.material === "ice") return this.iceCrack(kind, pan, strength);
     const ctx = this.ensure();
     if (!ctx || this.muted) return;
     const t0 = ctx.currentTime + 0.004;
@@ -127,7 +145,7 @@ export class CrackAudio {
     let t = t0 + 0.006;
     for (let i = 0; i < n; i++) {
       t += -Math.log(1 - Math.random()) * (big ? 0.011 : 0.009);
-      const fall = Math.exp(-(t - t0) * (big ? 9 : 14));
+      const fall = Math.exp(-(t - t0) * (big ? 13 : 14));
       this.grain(dest, t, {
         dur: rnd(0.002, 0.007),
         freq: rnd(2200, 8500),
@@ -140,10 +158,69 @@ export class CrackAudio {
     this.grain(dest, t0 + 0.004, { dur: big ? 0.16 : 0.1, freq: 520, q: 0.6, gain: 0.12 * s, type: "lowpass", attack: 0.006 });
 
     if (big) {
-      // the piece letting go a moment later
-      const t2 = t0 + rnd(0.05, 0.08);
-      this.grain(dest, t2, { dur: 0.01, freq: rnd(3000, 4200), q: 1.0, gain: 0.45, type: "highpass" });
-      this.tock(dest, t2, rnd(900, 1200), 0.12, 0.025);
+      // the piece letting go: close enough behind the snap (and without a
+      // sharp attack of its own) to fuse into one fuller break, not a second one
+      const t2 = t0 + rnd(0.01, 0.018);
+      this.grain(dest, t2, { dur: 0.04, freq: rnd(1400, 2000), q: 1.2, gain: 0.22, attack: 0.004 });
+      this.tock(dest, t2, rnd(380, 480), 0.1, 0.04);
+    }
+  }
+
+  /**
+   * The faluda's thick rose ice. Not a snap but a crunch: a hard glassy
+   * click, a dull thunk from the heavy slab, a short ring of clear inharmonic
+   * partials, then a dense gritty spray of crystals giving way. A few ice
+   * crackles keep settling after, like a cube dropped in a drink.
+   */
+  iceCrack(kind = "crack", pan = 0, strength = 1) {
+    const ctx = this.ensure();
+    if (!ctx || this.muted) return;
+    const t0 = ctx.currentTime + 0.004;
+    const dest = this.out(pan);
+    const big = kind === "pop";
+    const s = strength;
+
+    // 1. hard, bright click: brighter and shorter than chocolate
+    this.grain(dest, t0, { dur: 0.007, freq: rnd(4200, 5600), q: 0.7, gain: 1.15 * s, type: "highpass" });
+    this.grain(dest, t0, { dur: rnd(0.014, 0.022), freq: rnd(2300, 3200), q: rnd(3, 6), gain: 0.7 * s });
+    // 2. the slab itself: a dull, heavy thunk (thick ice, not a thin shell)
+    this.tock(dest, t0, rnd(105, 145), (big ? 0.5 : 0.36) * s, rnd(0.07, 0.1));
+    this.grain(dest, t0 + 0.001, { dur: 0.05, freq: 380, q: 0.7, gain: 0.3 * s, type: "lowpass", attack: 0.002 });
+    // 3. clear glassy ring: inharmonic partials, as struck ice has
+    const f = rnd(1250, 1900);
+    this.ping(dest, t0 + 0.001, f, 0.12 * s, rnd(0.05, 0.08));
+    this.ping(dest, t0 + 0.001, f * rnd(2.65, 2.85), 0.07 * s, rnd(0.035, 0.05));
+    this.ping(dest, t0 + 0.002, f * rnd(5.2, 5.6), 0.045 * s, rnd(0.02, 0.03));
+    // 4. crystals giving way: a dense, gritty crunch, part bright, part low
+    const n = Math.floor(big ? rnd(42, 58) : rnd(26, 36));
+    let t = t0 + 0.003;
+    for (let i = 0; i < n; i++) {
+      t += -Math.log(1 - Math.random()) * (big ? 0.0042 : 0.0036);
+      const fall = Math.exp(-(t - t0) * 16);
+      const low = Math.random() < 0.3;
+      this.grain(dest, t, {
+        dur: rnd(0.0015, low ? 0.009 : 0.005),
+        freq: low ? rnd(700, 1600) : rnd(2600, 10500),
+        q: rnd(1.2, 4),
+        gain: rnd(0.25, 0.7) * fall * s * (low ? 0.8 : 1),
+      });
+      if (Math.random() < 0.07) this.ping(dest, t, rnd(2400, 4800), 0.05 * fall * s, 0.018);
+    }
+    // 5. ice settling: a few tiny, sparse crackles after the break
+    const m = Math.floor(rnd(3, big ? 8 : 6));
+    for (let i = 0; i < m; i++) {
+      const tc = t0 + rnd(0.09, big ? 0.42 : 0.3);
+      this.grain(dest, tc, { dur: rnd(0.0015, 0.004), freq: rnd(3500, 9000), q: rnd(2, 5), gain: rnd(0.05, 0.14) * s });
+    }
+    // 6. the soft vanilla underneath, muffled by the ice
+    this.grain(dest, t0 + 0.006, { dur: big ? 0.14 : 0.09, freq: 420, q: 0.6, gain: 0.08 * s, type: "lowpass", attack: 0.008 });
+
+    if (big) {
+      // the chunk of ice letting go: folded into the same break (no second
+      // click), it just makes the crunch heavier and the slab thud deeper
+      const t2 = t0 + rnd(0.008, 0.015);
+      this.tock(dest, t2, rnd(85, 110), 0.22, 0.09);
+      this.grain(dest, t2, { dur: 0.06, freq: rnd(900, 1400), q: 0.9, gain: 0.2, attack: 0.005 });
     }
   }
 

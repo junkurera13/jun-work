@@ -11,6 +11,7 @@ uniform mat3 uCamBasis;    // object space (right, up, forward)
 uniform float uTanHalfFov;
 uniform mat3 uObjRot;      // object -> world rotation
 uniform float uTime;
+uniform bool uFaluda;
 
 uniform vec3 uBoundMin;
 uniform vec3 uBoundMax;
@@ -69,6 +70,7 @@ struct Parts {
   float hole;
   float sink;
   float cao;
+  float cnear;      // how much crack is nearby (ice whitens around a break)
   vec3 q;
 };
 
@@ -88,7 +90,7 @@ vec3 deformRef(vec3 p, float sag, float bulge, float taper, float shrink, out fl
 
 float bodyOuter(vec3 p, out vec3 q, out float hn) {
   q = deformRef(p, uSag, uBulge, uTaper, uShrink, hn);
-  float d = sdMelting(q, uMorph);
+  float d = sdMelting(q, uMorph, uFaluda);
   if (uErode > 0.0) {
     d += uErode * (0.5 + 0.5 * hn);
     d += min(uErode, 1.2) * 0.5 * (sn3(p * 0.9 + vec3(3.1, 7.7, 1.3)) - 0.5);
@@ -106,6 +108,17 @@ float bodyOuter(vec3 p, out vec3 q, out float hn) {
 // as a fraction of the way around: the texture repeats, so there's no seam.
 float crackS(vec3 q) {
   float y = q.y;
+  if (uFaluda) {
+    float radius = faludaCorner(y);
+    float dy = max(0.0, abs(y - BAR_MID) - BAR_HEIGHT * 0.5 + radius);
+    float w = FALUDA_W - radius + sqrt(max(0.0, radius * radius - dy * dy));
+    float nx = abs(q.x) / w;
+    float nz = abs(q.z) / FALUDA_T;
+    float arc = nx <= nz ? w * nx / max(nz, 1e-5) : w + FALUDA_T * (1.0 - nz / nx);
+    float halfPerimeter = 2.0 * (w + FALUDA_T);
+    float u = q.z >= 0.0 ? arc : halfPerimeter - arc;
+    return (q.x < 0.0 ? -u : u) / (2.0 * halfPerimeter);
+  }
   float a = mix(2.98, 2.58, smoothstep(-3.2, 5.6, y));
   float n = mix(3.2, 2.62, smoothstep(-4.8, 5.6, y));
   float sy = min(abs(y - BAR_MID) / 5.2, 0.999);
@@ -118,13 +131,14 @@ float crackS(vec3 q) {
 }
 
 float crackField(vec3 q, out float sink, out float fill, out float inHole, out float holeEdge,
-                 out float recess, out float gapAO, out float sinkCore) {
+                 out float recess, out float gapAO, out float sinkCore, out vec2 nearOut) {
   vec2 uv = vec2(crackS(q) + 0.5, (6.1 - q.y) / 11.52);
   vec4 t0 = textureLod(uCrackTex, uv, 0.0);
   vec4 tb = textureLod(uCrackTex, uv, 2.5);
   // blurred copies of the crack mask (mip levels): how much crack is nearby
   float near = textureLod(uCrackTex, uv, 2.0).r;
   float wide = textureLod(uCrackTex, uv, 3.5).r;
+  nearOut = vec2(near, wide);
   // Melting doesn't heal anything: it softens it. Crisp breaks slump into
   // rounded, blurred edges, hairline cracks fill in and fade, steps between
   // plates smooth out, and holes stay open with soft melted rims.
@@ -176,7 +190,8 @@ void bodyEval(vec3 p, inout Parts P) {
   P.outer = dO;
   P.hn = hn;
   P.q = q;
-  float tcE = SHELL_T * (1.0 - 0.6 * uMeltC);
+  // the faluda's rose ice is a thick wall round the vanilla, not a thin coat
+  float tcE = uFaluda ? FALUDA_SHELL * (1.0 - 0.8 * uMeltC) : SHELL_T * (1.0 - 0.6 * uMeltC);
   float dCore = dO + tcE;
   float dShell = dO;
   // by the end the shell has melted away and the cracks fade out with it
@@ -189,7 +204,9 @@ void bodyEval(vec3 p, inout Parts P) {
   // (holes need checking until the chocolate itself is gone)
   if (uCracks > 0.5 && uChocGone < 1.05 && dO < 0.35 && dO > -0.6) {
     float sink, fill, inHole, holeEdge, recess, gapAO, sinkCore;
-    float vd = crackField(q, sink, fill, inHole, holeEdge, recess, gapAO, sinkCore);
+    vec2 nw;
+    float vd = crackField(q, sink, fill, inHole, holeEdge, recess, gapAO, sinkCore, nw);
+    P.cnear = nw.x * crackFade;
     sink *= crackFade;
     sinkCore *= vanillaFade;
     recess *= vanillaFade;
@@ -197,7 +214,15 @@ void bodyEval(vec3 p, inout Parts P) {
     // thin cracks close up; popped holes stay open until the chocolate goes
     vd = mix(0.3, vd, max(crackFade, inHole));
     // the press pushes shell and ice cream in together
-    dShell = max(dO + sink, -vd);
+    float carve = vd;
+    if (uFaluda) {
+      // thick ice: a hairline break only opens a little way in (its pale,
+      // frosted floor is what makes ice cracks look white); broken-out
+      // pieces and crushed holes go right through to the vanilla
+      float through = max(inHole, smoothstep(0.45, 0.85, nw.y));
+      carve = max(vd, -(dO + sink) - mix(0.13, FALUDA_SHELL + 0.3, through));
+    }
+    dShell = max(dO + sink, -carve);
     dCore += sinkCore + recess;
     P.cao = gapAO;
     P.sink = sink;
@@ -237,6 +262,10 @@ float stickHalfWidth(float y) {
 }
 
 float sdStickBase(vec3 p) {
+  if (uFaluda) {
+    float profile = sdRoundedRect(p.xy - vec2(0.0, STICK_WAIST_Y), vec2(FALUDA_STICK_W, -STICK_WAIST_Y), FALUDA_STICK_W);
+    return sdRoundedExtrusion(profile, p.z, STICK_HT, 0.06);
+  }
   // the stick is an exact mirror image of itself across the pinch
   float ym = STICK_WAIST_Y - abs(p.y - STICK_WAIST_Y);
   float yc0 = STICK_Y0 + STICK_END_R;
@@ -252,6 +281,7 @@ float sdStickBase(vec3 p) {
 }
 
 float engraveMask(vec3 p) {
+  // same scale on both sticks so the letters keep their proportions
   vec2 uv = vec2(p.x / (2.0 * STICK_HW) + 0.5, (p.y - TEXT_Y0) / (TEXT_Y1 - TEXT_Y0));
   if (p.z < 0.0) uv.x = 1.0 - uv.x;
   if (uv.y <= 0.0 || uv.y >= 1.0 || uv.x <= 0.0 || uv.x >= 1.0) return 0.0;
@@ -318,7 +348,7 @@ const vec3 BODY_MAX = vec3(3.5, 6.0, 2.45);
 float scene(vec3 p, bool full, out Parts P) {
   P.shell = 1e5; P.core = 1e5; P.body = 1e5; P.stick = 1e5;
   P.liq = 1e5; P.liqC = 0.0; P.frag = 1e5; P.fragSide = 0.0; P.crumb = 1e5;
-  P.outer = 1e5; P.hn = 0.0; P.fill = 0.0; P.hole = 0.0; P.sink = 0.0; P.cao = 1.0; P.q = p;
+  P.outer = 1e5; P.hn = 0.0; P.fill = 0.0; P.hole = 0.0; P.sink = 0.0; P.cao = 1.0; P.cnear = 0.0; P.q = p;
 
   vec3 o = max(BODY_MIN - p, p - BODY_MAX);
   float bb = length(max(o, 0.0));
@@ -469,6 +499,7 @@ struct Mat {
   float sss;
   vec3 sssCol;
   float spec;
+  float sheen;  // frosty velvet glow at grazing angles
 };
 
 Mat mixMat(Mat a, Mat b, float t) {
@@ -478,6 +509,7 @@ Mat mixMat(Mat a, Mat b, float t) {
   m.sss = mix(a.sss, b.sss, t);
   m.sssCol = mix(a.sssCol, b.sssCol, t);
   m.spec = mix(a.spec, b.spec, t);
+  m.sheen = mix(a.sheen, b.sheen, t);
   return m;
 }
 
@@ -490,26 +522,80 @@ Mat chocolate(vec3 p, float melt) {
   m.sss = 0.05 + 0.25 * melt;
   m.sssCol = srgb(vec3(0.6, 0.3, 0.14));
   m.spec = 1.0;
+  m.sheen = 0.0;
   return m;
+}
+
+// Rose ice straight from the freezer: deep raspberry-rose, satin rather than
+// shiny, with a pale frost bloom that gathers where the faces roll over into
+// the sides and on the top, and a scatter of tiny ice crystals. As it melts
+// the frost goes, the colour deepens and it turns wet and glossy.
+Mat faludaIce(vec3 p, vec3 q, float melt) {
+  Mat m;
+  float thaw = smoothstep(0.0, 0.5, melt);
+  // the syrup froze a touch unevenly: soft clouding, drawn out along the bar
+  float cloud = sn3(p * vec3(1.4, 0.5, 1.4) + vec3(4.0, 1.0, 7.0));
+  float cloud2 = vnoise3(p * vec3(4.5, 1.5, 4.5) + 2.0);
+  float tone = clamp(0.3 + 0.9 * (cloud - 0.5) + 0.35 * (cloud2 - 0.5), 0.0, 1.0);
+  vec3 deep = srgb(vec3(0.79, 0.05, 0.24));
+  vec3 rose = srgb(vec3(0.92, 0.19, 0.38));
+  vec3 c = mix(deep, rose, tone);
+  // frost bloom
+  float o = faludaOutline(q.xy);
+  float rim = 1.0 - smoothstep(0.25, 1.35, -o);
+  float top = smoothstep(2.6, 5.6, q.y);
+  float patchy = smoothstep(0.25, 0.75, sn3(p * 1.7 + 11.0) * 0.7 + sn3(p * 4.1 + 3.0) * 0.3);
+  float frost = clamp(0.05 + 0.45 * rim + 0.12 * top, 0.0, 1.0) * mix(0.55, 1.0, patchy) * (1.0 - thaw);
+  c = mix(c, srgb(vec3(0.97, 0.64, 0.72)), frost * 0.5);
+  // tiny ice crystals catching the light: sparse, pin-sized
+  float crystal = smoothstep(0.9, 0.97, vnoise3(p * 52.0 + 5.0)) * (1.0 - thaw);
+  c = mix(c, srgb(vec3(1.0, 0.86, 0.91)), crystal * 0.4);
+  // melting: wet syrup, a deeper, richer red-rose
+  c = mix(c, srgb(vec3(0.78, 0.05, 0.26)), thaw * 0.45);
+  m.albedo = c;
+  m.rough = mix(0.36 + 0.24 * frost + 0.1 * crystal, 0.07, thaw);
+  m.sss = 0.8;
+  m.sssCol = srgb(vec3(1.0, 0.28, 0.38));
+  m.spec = mix(0.75, 1.15, thaw);
+  m.sheen = mix(0.12 + 0.5 * frost, 0.0, thaw);
+  return m;
+}
+
+Mat shellMaterial(vec3 p, vec3 q, float melt) {
+  if (uFaluda) return faludaIce(p, q, melt);
+  return chocolate(p, melt);
 }
 
 Mat vanilla(float melt) {
   Mat m;
-  m.albedo = mix(srgb(vec3(0.93, 0.885, 0.77)), srgb(vec3(0.96, 0.9, 0.74)), melt);
+  // creamy vanilla, not snow: a warm buttery yellow that deepens a little as it softens
+  m.albedo = mix(srgb(vec3(0.95, 0.87, 0.63)), srgb(vec3(0.97, 0.87, 0.6)), melt);
   m.rough = mix(0.62, 0.14, melt);
   m.sss = mix(0.55, 0.85, melt);
-  m.sssCol = srgb(vec3(1.0, 0.86, 0.62));
+  m.sssCol = srgb(vec3(1.0, 0.8, 0.48));
   m.spec = mix(0.6, 1.0, melt);
+  m.sheen = 0.0;
   return m;
 }
 
 Mat fracture() {
   Mat m;
+  if (uFaluda) {
+    // freshly broken ice: paler, crystalline and lit from within
+    m.albedo = srgb(vec3(0.98, 0.5, 0.6));
+    m.rough = 0.42;
+    m.sss = 0.9;
+    m.sssCol = srgb(vec3(1.0, 0.4, 0.56));
+    m.spec = 0.9;
+    m.sheen = 0.35;
+    return m;
+  }
   m.albedo = srgb(vec3(0.42, 0.25, 0.15));
   m.rough = 0.78;
   m.sss = 0.05;
   m.sssCol = srgb(vec3(0.6, 0.3, 0.14));
   m.spec = 0.5;
+  m.sheen = 0.0;
   return m;
 }
 
@@ -537,6 +623,7 @@ Mat wood(vec3 p, float engr) {
   m.sss = 0.06;
   m.sssCol = srgb(vec3(0.9, 0.7, 0.45));
   m.spec = 0.7;
+  m.sheen = 0.0;
   return m;
 }
 
@@ -557,12 +644,12 @@ vec3 shade(vec3 p, vec3 rd, float pix) {
   float chocLocal = clamp(uMeltC * (0.75 + 0.45 * P.hn) + (sn3(p * 0.8 + 2.0) - 0.5) * 0.3 * uMeltC, 0.0, 1.0);
 
   if (P.frag <= best + 1e-5) {
-    if (P.fragSide < 0.5) { m = chocolate(p, uMeltC * 0.8); bumpAmp = 0.06; bumpFreq = 1.6; }
+    if (P.fragSide < 0.5) { m = shellMaterial(p, P.q, uMeltC * 0.8); bumpAmp = 0.06; bumpFreq = 1.6; }
     else if (P.fragSide < 1.5) { m = fracture(); bumpAmp = 0.5; bumpFreq = 30.0; }
     else { m = vanilla(0.1); m.albedo *= 0.96; bumpAmp = 0.35; bumpFreq = 22.0; }
   } else if (P.crumb <= best + 1e-5) {
     m = fracture();
-    m.albedo = mix(m.albedo, srgb(vec3(0.36, 0.2, 0.11)), 0.5);
+    m.albedo = mix(m.albedo, srgb(uFaluda ? vec3(0.91, 0.17, 0.47) : vec3(0.36, 0.2, 0.11)), 0.5);
     bumpAmp = 0.5; bumpFreq = 25.0;
   } else {
     // body (shell / core), stick, liquid blend
@@ -574,9 +661,16 @@ vec3 shade(vec3 p, vec3 rd, float pix) {
         bm = mixMat(fracture(), chocolate(p, chocLocal), slumpS);
         bumpAmp = 0.45 * (1.0 - slumpS); bumpFreq = 32.0;
       } else {
-        bm = chocolate(p, chocLocal);
+        bm = shellMaterial(p, P.q, chocLocal);
         bumpAmp = mix(0.05, 0.03, chocLocal); bumpFreq = 1.15;
-        bumpAmp2 = mix(0.008, 0.0, chocLocal); bumpFreq2 = 46.0;
+        bumpAmp2 = (uFaluda ? 0.035 : 0.008) * (1.0 - chocLocal); bumpFreq2 = 46.0;
+        if (uFaluda) {
+          // ice turns white around a break (stress crazing)
+          float craze = smoothstep(0.03, 0.4, P.cnear) * (1.0 - chocLocal);
+          bm.albedo = mix(bm.albedo, srgb(vec3(1.0, 0.8, 0.87)), 0.5 * craze);
+          bm.rough = mix(bm.rough, 0.55, 0.5 * craze);
+          bm.sheen += 0.4 * craze;
+        }
       }
     } else {
       float vm = clamp(uMeltV * 1.15 + P.fill * 0.6 + P.hole * uMeltV * 0.4, 0.0, 1.0);
@@ -596,9 +690,9 @@ vec3 shade(vec3 p, vec3 rd, float pix) {
     float wl = sminMix(dbs, P.liq, 0.13);
     if (wl > 0.0) {
       Mat lv = vanilla(1.0);
-      lv.albedo = srgb(vec3(0.99, 0.94, 0.8));
-      Mat lc = chocolate(p, 1.0);
-      lc.albedo = srgb(vec3(0.4, 0.235, 0.135));
+      lv.albedo = srgb(uFaluda ? vec3(0.98, 0.76, 0.8) : vec3(0.99, 0.9, 0.66));
+      Mat lc = shellMaterial(p, P.q, 1.0);
+      lc.albedo = srgb(uFaluda ? vec3(0.84, 0.1, 0.34) : vec3(0.4, 0.235, 0.135));
       lc.rough = 0.08;
       Mat lm = mixMat(lv, lc, P.liqC);
       lm.rough = 0.07;
@@ -651,6 +745,12 @@ vec3 shade(vec3 p, vec3 rd, float pix) {
   vec3 glint = keyCol * ggx(max(dot(nW, H), 0.0), a) * max(NoL, 0.0) * sh * 0.06 * m.spec * (F0 + (1.0 - F0) * pow(1.0 - max(dot(H, vW), 0.0), 5.0));
 
   vec3 col = diff * (1.0 - specW) + spec + sss + min(glint, vec3(6.0));
+  // frost: a pale velvety glow where the surface turns away from you
+  if (m.sheen > 0.0) {
+    float graze = pow(1.0 - NoV, 2.5);
+    col += m.sheen * srgb(vec3(1.0, 0.86, 0.91)) * graze
+         * (envIrr(nW) * ao * 0.45 + keyCol * clamp(NoL + 0.3, 0.0, 1.0) * mix(sh, 1.0, 0.4) * 0.22);
+  }
   return col;
 }
 
@@ -681,7 +781,7 @@ void main() {
   float minRatio = 1e9;
   float tBest = t;
   bool hit = false;
-  for (int i = 0; i < 180; i++) {
+  for (int i = 0; i < 240; i++) {
     vec3 p = ro + rd * t;
     float d = map(p);
     float pix = t * pixAngle;

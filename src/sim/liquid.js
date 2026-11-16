@@ -15,7 +15,8 @@ export class Liquid {
     this.reset();
   }
 
-  reset() {
+  reset(faluda = false) {
+    this.faluda = faluda;
     this.streams = new Map();
     this.falling = [];
     this.seed();
@@ -24,11 +25,22 @@ export class Liquid {
   seed() {
     // fixed melt sources for one ice cream (reference space)
     const s = [];
-    s.push({ id: "stickF", kind: "stick", mat: 0, x: 0.16, side: 1, from: 0.012, feed: (M) => 0.35 + 1.1 * M.meltV });
-    s.push({ id: "cornerL", kind: "bottom", mat: 0, x: -1.75, side: 0, from: 0.05, feed: (M) => 0.25 + 1.0 * M.meltV });
-    s.push({ id: "stickB", kind: "stick", mat: 0, x: -0.14, side: -1, from: 0.09, feed: (M) => 0.3 + 1.0 * M.meltV });
-    s.push({ id: "cornerR", kind: "bottom", mat: 0, x: 1.9, side: 0, from: 0.17, feed: (M) => 0.2 + 0.9 * M.meltV });
-    s.push({ id: "stickF2", kind: "stick", mat: 1, x: -0.22, side: 1, from: 0.3, feed: (M) => 0.2 + 0.8 * M.meltC });
+    if (this.faluda) {
+      // the ice goes first: rose syrup runs off the bottom and down the stick
+      // straight away (thin and runny, so it feeds harder); the vanilla only
+      // follows once the ice round it has gone
+      s.push({ id: "stickF", kind: "stick", mat: 1, x: 0.16, side: 1, from: 0.008, feed: (M) => 0.45 + 1.2 * M.meltC });
+      s.push({ id: "cornerL", kind: "bottom", mat: 1, x: -1.75, side: 0, from: 0.03, feed: (M) => 0.35 + 1.1 * M.meltC });
+      s.push({ id: "stickB", kind: "stick", mat: 1, x: -0.14, side: -1, from: 0.06, feed: (M) => 0.4 + 1.1 * M.meltC });
+      s.push({ id: "cornerR", kind: "bottom", mat: 1, x: 1.9, side: 0, from: 0.1, feed: (M) => 0.3 + 1.0 * M.meltC });
+      s.push({ id: "stickF2", kind: "stick", mat: 0, x: -0.22, side: 1, from: 0.5, feed: (M) => 0.2 + 0.9 * M.meltV });
+    } else {
+      s.push({ id: "stickF", kind: "stick", mat: 0, x: 0.16, side: 1, from: 0.012, feed: (M) => 0.35 + 1.1 * M.meltV });
+      s.push({ id: "cornerL", kind: "bottom", mat: 0, x: -1.75, side: 0, from: 0.05, feed: (M) => 0.25 + 1.0 * M.meltV });
+      s.push({ id: "stickB", kind: "stick", mat: 0, x: -0.14, side: -1, from: 0.09, feed: (M) => 0.3 + 1.0 * M.meltV });
+      s.push({ id: "cornerR", kind: "bottom", mat: 0, x: 1.9, side: 0, from: 0.17, feed: (M) => 0.2 + 0.9 * M.meltV });
+      s.push({ id: "stickF2", kind: "stick", mat: 1, x: -0.22, side: 1, from: 0.3, feed: (M) => 0.2 + 0.8 * M.meltC });
+    }
     const th = [0.07, 0.16, 0.26, 0.36, 0.48, 0.62];
     for (let i = 0; i < th.length; i++) {
       s.push({
@@ -50,7 +62,7 @@ export class Liquid {
         x: rand(-1.4, 1.4),
         y: 4.9,
         side: i % 2 === 0 ? 1 : -1,
-        from: 0.36 + i * 0.08,
+        from: (this.faluda ? 0.55 : 0.36) + i * 0.08,
         feed: (M) => 0.5 + 0.8 * M.meltV,
       });
     }

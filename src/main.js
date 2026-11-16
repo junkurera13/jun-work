@@ -13,6 +13,7 @@ const canvas = document.querySelector("#scene");
 const controls = document.querySelector(".controls");
 const weatherRoot = document.querySelector(".weather");
 const resetBtn = document.querySelector(".reset");
+const flavorButtons = document.querySelectorAll(".flavor");
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 const FOV = (24 * Math.PI) / 180;
@@ -34,6 +35,7 @@ const liquid = new Liquid();
 
 const state = {
   P: 0,
+  faluda: false,
   weather: WEATHER_DEFAULT,
   // eased blend of the weathers (for the painted sky, light and melt speed)
   weatherW: WEATHERS.map((_, i) => (i === WEATHER_DEFAULT ? 1 : 0)),
@@ -137,7 +139,7 @@ function updateWorld() {
 // --------------------------------------------------------------- picking ---
 
 function sceneDistJS(x, y, z, M) {
-  return Math.min(bodyOuter(x, y, z, M), sdStick(x, y, z));
+  return Math.min(bodyOuter(x, y, z, M), sdStick(x, y, z, M.faluda));
 }
 
 function pick(clientX, clientY) {
@@ -151,7 +153,7 @@ function pick(clientX, clientY) {
   });
   const ro = world.worldToObj(cam.pos.x, cam.pos.y, cam.pos.z);
   const rd = world.worldDirToObj(dw.x, dw.y, dw.z);
-  const M = meltParams(state.P);
+  const M = meltParams(state.P, state.faluda);
   let t = cam.D - 12;
   for (let i = 0; i < 140; i++) {
     const x = ro.x + rd.x * t;
@@ -165,7 +167,7 @@ function pick(clientX, clientY) {
         y: sceneDistJS(x, y + e, z, M) - sceneDistJS(x, y - e, z, M),
         z: sceneDistJS(x, y, z + e, M) - sceneDistJS(x, y, z - e, M),
       });
-      const onBody = bodyOuter(x, y, z, M) < sdStick(x, y, z) + 0.002;
+      const onBody = bodyOuter(x, y, z, M) < sdStick(x, y, z, M.faluda) + 0.002;
       return { x, y, z, normal: n, onBody, M };
     }
     t += d * 0.85;
@@ -256,14 +258,21 @@ window.addEventListener("pointercancel", onUp);
 canvas.addEventListener("contextmenu", (e) => e.preventDefault());
 
 window.addEventListener("keydown", (e) => {
-  if (e.target === resetBtn || e.target.closest?.(".controls")) return;
+  if (e.target === resetBtn || e.target.closest?.(".controls, .flavors")) return;
   if (e.key === "ArrowLeft") state.yawVel -= 2;
   if (e.key === "ArrowRight") state.yawVel += 2;
 });
 
+let resetRevealFrame = 0;
+
 function revealReset() {
+  if (resetRevealFrame || resetBtn.classList.contains("is-visible")) return;
   resetBtn.hidden = false;
-  requestAnimationFrame(() => resetBtn.classList.add("is-visible"));
+  resetRevealFrame = requestAnimationFrame(() => {
+    resetRevealFrame = 0;
+    resetBtn.inert = false;
+    resetBtn.classList.add("is-visible");
+  });
 }
 
 function newIceCream() {
@@ -273,9 +282,12 @@ function newIceCream() {
   state.pitch = 0;
   state.yawVel = 0;
   state.pitchVel = 0;
-  fracture.reset();
-  liquid.reset();
+  fracture.reset(state.faluda);
+  liquid.reset(state.faluda);
   canvas.classList.remove("has-cracked");
+  cancelAnimationFrame(resetRevealFrame);
+  resetRevealFrame = 0;
+  resetBtn.inert = true;
   resetBtn.classList.remove("is-visible");
   if (renderer) renderer.uploadCracks(fracture.canvas);
 }
@@ -284,6 +296,23 @@ resetBtn.addEventListener("click", () => {
   audio.ensure();
   newIceCream();
 });
+
+for (const button of flavorButtons) {
+  button.addEventListener("click", () => {
+    const faluda = button.dataset.flavor === "faluda";
+    if (faluda === state.faluda) return;
+    state.faluda = faluda;
+    audio.material = faluda ? "ice" : "choc";
+    for (const option of flavorButtons) option.setAttribute("aria-pressed", String(option === button));
+    canvas.setAttribute("aria-label", faluda
+      ? "A pink Faluda popsicle with a vanilla ice cream center. Tap to crack the icy shell."
+      : "A Magic Choc vanilla ice cream. Tap it to crack the chocolate shell; it melts slowly.");
+    pointer = null;
+    state.shake = 0;
+    canvas.classList.remove("is-dragging", "is-hover");
+    newIceCream();
+  });
+}
 
 // ----------------------------------------------------------------- loop ----
 
@@ -352,7 +381,7 @@ function frame(now) {
   // melting
   if (state.appear >= 1) state.P = Math.min(1, state.P + (dt * rate) / MELT_SECONDS);
   if (state.P > 0.04) revealReset();
-  const M = meltParams(state.P);
+  const M = meltParams(state.P, state.faluda);
 
   // motion
   // the entrance runs on wall-clock time so it never drags on slow devices

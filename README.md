@@ -1,13 +1,15 @@
 # Jun Park
 
-A blank white page with one Magic Choc vanilla ice cream on it.
+A blank white page with a Magic Choc vanilla ice cream and a Faluda popsicle: a thick wall of frosty rose ice around a vanilla ice cream centre.
+Use the flavor buttons below the scene to switch between them.
 
-- **Tap / click** the chocolate shell to break it: a patch around your finger snaps into
+- **Tap / click** the shell to break it: a patch around your finger snaps into
   irregular plates that sink into the soft ice cream. Cracks stop where they meet older ones, so
   the shell breaks up finer the more you press. Press a broken plate again to pop it out.
 - **Drag** to turn it around.
 - It **melts** slowly by itself: the vanilla goes first, leaking from the bottom (and
-  welling up through any cracks), then the chocolate softens. Drips run down the
+  welling up through any cracks), then the shell softens. The Faluda goes the other way round:
+  its rose ice runs first as syrup and melts off a vanilla centre that holds on longer. Drips run down the
   surface and the stick and fall off the bottom of the screen. Keep watching and the
   stick comes out.
 - The **weather words** along the top (snow · rain · breeze · sunshine · heatwave) change the painted sky behind it and

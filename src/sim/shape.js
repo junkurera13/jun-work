@@ -12,6 +12,14 @@ export const STICK_HT = 0.14;
 export const STICK_Y0 = -9.5;
 export const STICK_Y1 = 0.0;
 
+// Faluda popsicle dimensions, mirror common.glsl. Same height and stick length
+// as the Magic Choc bar.
+const FALUDA_W = 2.62;
+const FALUDA_T = 1.02;
+const FALUDA_EDGE = 0.78;
+export const FALUDA_SHELL = 0.46;
+const FALUDA_STICK_W = 0.52;
+
 const fract = (x) => x - Math.floor(x);
 const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
 const mix = (a, b, t) => a + (b - a) * t;
@@ -115,6 +123,30 @@ export function sdBar(x, y, z) {
   return (f - 1) / Math.max(Math.hypot(gx, gy, gz), 1e-4);
 }
 
+function faludaCorner(y) {
+  return mix(0.8, 2.05, smoothstep(BAR_MID - 1, BAR_MID + 1, y));
+}
+
+function roundedRect(x, y, w, h, radius) {
+  const dx = Math.abs(x) - w + radius;
+  const dy = Math.abs(y) - h + radius;
+  return Math.hypot(Math.max(dx, 0), Math.max(dy, 0)) + Math.min(Math.max(dx, dy), 0) - radius;
+}
+
+function roundedExtrusion(profile, z, thickness, bevel) {
+  const dx = profile + bevel;
+  const dy = Math.abs(z) - thickness + bevel;
+  return Math.hypot(Math.max(dx, 0), Math.max(dy, 0)) + Math.min(Math.max(dx, dy), 0) - bevel;
+}
+
+export function sdFaluda(x, y, z) {
+  const o = roundedRect(x, y - BAR_MID, FALUDA_W, BAR_HEIGHT / 2, faludaCorner(y));
+  const ex = x / FALUDA_W;
+  const ey = (y - BAR_MID) / (BAR_HEIGHT / 2);
+  const t = FALUDA_T - 0.09 * ex * ex - 0.04 * ey * ey;
+  return roundedExtrusion(o, z, t, FALUDA_EDGE) * 0.97;
+}
+
 export function sdBlob(x, y, z) {
   const cx = x / 2.5;
   const cy = (y - 0.1) / 4.9;
@@ -124,8 +156,8 @@ export function sdBlob(x, y, z) {
   return (k0 * (k0 - 1)) / Math.max(k1, 1e-4);
 }
 
-export function sdMelting(x, y, z, morph) {
-  const a = sdBar(x, y, z);
+export function sdMelting(x, y, z, morph, faluda) {
+  const a = faluda ? sdFaluda(x, y, z) : sdBar(x, y, z);
   if (!(morph > 0)) return a;
   return a + (sdBlob(x, y, z) - a) * morph;
 }
@@ -153,7 +185,7 @@ export function refToObj(qx, qy, qz, sag, bulge, taper = 0, shrink = 0) {
 
 export function bodyOuter(x, y, z, M) {
   const q = deformRef(x, y, z, M.sag, M.bulge, M.taper, M.shrink);
-  let d = sdMelting(q.x, q.y, q.z, M.morph);
+  let d = sdMelting(q.x, q.y, q.z, M.morph, M.faluda);
   if (M.erode > 0) {
     d += M.erode * (0.5 + 0.5 * q.hn);
     d += Math.min(M.erode, 1.2) * 0.5 * (sn3(x * 0.9 + 3.1, y * 0.9 + 7.7, z * 0.9 + 1.3) - 0.5);
@@ -169,7 +201,11 @@ export function stickHalfWidth(y) {
 }
 
 // Waisted paddle stick, mirrors sdStickBase in scene.frag.glsl
-export function sdStick(x, y, z) {
+export function sdStick(x, y, z, faluda) {
+  if (faluda) {
+    const profile = roundedRect(x, y - STICK_WAIST_Y, FALUDA_STICK_W, -STICK_WAIST_Y, FALUDA_STICK_W);
+    return roundedExtrusion(profile, z, STICK_HT, 0.06);
+  }
   // exact mirror image across the pinch
   const ym = STICK_WAIST_Y - Math.abs(y - STICK_WAIST_Y);
   const yc0 = STICK_Y0 + STICK_END_R;
@@ -189,7 +225,13 @@ export function sdStick(x, y, z) {
 // scene.frag.glsl.
 
 /** Cross-section of the undeformed bar at height y: half width W, half thickness T. */
-export function crossSection(y) {
+export function crossSection(y, faluda) {
+  if (faluda) {
+    const radius = faludaCorner(y);
+    const dy = Math.max(0, Math.abs(y - BAR_MID) - BAR_HEIGHT / 2 + radius);
+    const W = FALUDA_W - radius + Math.sqrt(Math.max(0, radius * radius - dy * dy));
+    return { W, T: FALUDA_T, R: (2 * (W + FALUDA_T)) / Math.PI };
+  }
   const a = mix(2.98, 2.58, smoothstep(-3.2, 5.6, y));
   const n = mix(3.2, 2.62, smoothstep(-4.8, 5.6, y));
   const sy = Math.min(Math.abs(y - BAR_MID) / 5.2, 0.999);
@@ -199,15 +241,35 @@ export function crossSection(y) {
 }
 
 /** Reference-space point -> chart (u, y). */
-export function toChart(x, y, z) {
-  const c = crossSection(y);
+export function toChart(x, y, z, faluda) {
+  const c = crossSection(y, faluda);
+  if (faluda) {
+    // Project onto the box perimeter so fractures keep their proportions on the flat faces.
+    const nx = Math.abs(x) / c.W;
+    const nz = Math.abs(z) / c.T;
+    const distance = nx <= nz ? c.W * nx / Math.max(nz, 1e-5) : c.W + c.T * (1 - nz / nx);
+    const u = z >= 0 ? distance : Math.PI * c.R - distance;
+    return { u: x < 0 ? -u : u, y, R: c.R };
+  }
   const phi = Math.atan2(x / c.W, z / c.T);
   return { u: c.R * (phi - 0.5 * c.e * Math.sin(2 * phi)), y, R: c.R };
 }
 
 /** Chart (u, y) -> reference-space surface direction (x on the surface, side +1 front / -1 back). */
-export function fromChart(u, y) {
-  const c = crossSection(y);
+export function fromChart(u, y, faluda) {
+  const c = crossSection(y, faluda);
+  if (faluda) {
+    const half = Math.PI * c.R;
+    const wrapped = ((u + half) % (2 * half) + 2 * half) % (2 * half) - half;
+    const side = Math.abs(wrapped) <= c.W + c.T ? 1 : -1;
+    const distance = side === 1 ? Math.abs(wrapped) : half - Math.abs(wrapped);
+    return {
+      // Runs near the side start just inside the bevel on the corresponding face.
+      x: Math.sign(wrapped) * Math.min(distance, c.W - 0.34),
+      z: side * (c.T - Math.max(0, distance - c.W)),
+      side,
+    };
+  }
   let phi = u / c.R;
   for (let i = 0; i < 4; i++) {
     const f = c.R * (phi - 0.5 * c.e * Math.sin(2 * phi)) - u;

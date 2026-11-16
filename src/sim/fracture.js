@@ -1,4 +1,4 @@
-import { crossSection, deformRef, fromChart, toChart } from "./shape.js";
+import { BAR_BOTTOM, BAR_HEIGHT, crossSection, deformRef, fromChart, toChart } from "./shape.js";
 import { mulMat3, quatIntegrate, rand } from "./math.js";
 
 // Cracks live in a texture that wraps all the way around the shell like a
@@ -36,11 +36,6 @@ function clipHalf(poly, a, b) {
   return out;
 }
 
-/** Distance once around the bar at height y (cm). */
-function period(y) {
-  return 2 * Math.PI * crossSection(y).R;
-}
-
 function pointInPoly(x, y, poly) {
   let inside = false;
   for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
@@ -65,7 +60,7 @@ function segHit(ax, ay, bx, by, cx, cy, dx, dy) {
 }
 
 /**
- * A brittle chocolate shell. Every press shatters a patch around the finger
+ * A brittle shell. Every press shatters a patch around the finger
  * into irregular, straight-edged plates (small near the finger, larger
  * further out), all at once, like a snap. Edges stop where they meet older
  * cracks, so the shell keeps breaking up finer. Plates that broke free are
@@ -82,7 +77,7 @@ export class Fracture {
     this.reset();
   }
 
-  reset() {
+  reset(faluda = false) {
     const g = this.g;
     g.globalCompositeOperation = "source-over";
     g.fillStyle = "#000";
@@ -99,6 +94,12 @@ export class Fracture {
     this.texDirty = true;
     this.nextId = 1;
     this.off = 0;
+    this.faluda = faluda;
+  }
+
+  /** Distance once around the bar at height y (cm). */
+  period(y) {
+    return 2 * Math.PI * crossSection(y, this.faluda).R;
   }
 
   /**
@@ -106,11 +107,12 @@ export class Fracture {
    * of the way around the bar and it repeats, so there is no seam anywhere.
    */
   px(face, u, y) {
-    return [(u / period(y) + 0.5) * CRACK_W + this.off, (Y1 - y) * PX];
+    return [(u / this.period(y) + 0.5) * CRACK_W + this.off, (Y1 - y) * PX];
   }
 
-  /** Is chart point (u, y) on the shell? Stops short of the back seam and the very ends. */
+  /** Is chart point (u, y) within the height of the shell? */
   onShell(u, y) {
+    if (this.faluda) return y >= BAR_BOTTOM && y <= BAR_BOTTOM + BAR_HEIGHT;
     return crossSection(y).W > 0.45;
   }
 
@@ -118,7 +120,7 @@ export class Fracture {
   arrest(face, ax, ay, bx, by, impactId, pathId, nearOrigin) {
     let best = -1;
     const list = this.segs[face];
-    const P = period((ay + by) / 2);
+    const P = this.period((ay + by) / 2);
     const miny = Math.min(ay, by) - 1e-3;
     const maxy = Math.max(ay, by) + 1e-3;
     for (const shift of [0, P, -P]) {
@@ -141,7 +143,7 @@ export class Fracture {
   press(hit, now, M, world) {
     const q = deformRef(hit.x, hit.y, hit.z, M.sag, M.bulge, M.taper, M.shrink);
     const face = 0; // one chart all the way round
-    const ch = toChart(q.x, q.y, q.z);
+    const ch = toChart(q.x, q.y, q.z, this.faluda);
     q.x = ch.u;
     this.any = true;
     this.ooze = Math.max(this.ooze, 0.22); // a press squeezes a little vanilla up
@@ -637,7 +639,7 @@ export class Fracture {
     if (this.ooze < 0.5) return [];
     const out = this.impacts.map((imp) => {
       const y = imp.hole > 0.15 ? imp.y - imp.hole * 0.9 : Math.max(imp.low, imp.y - 1.0);
-      const r = fromChart(imp.x, y);
+      const r = fromChart(imp.x, y, this.faluda);
       return { id: `i${imp.id}`, x: r.x + Math.sin(imp.id * 7.3) * 0.12, y, side: r.side, hole: imp.hole > 0.15, fill: this.ooze };
     });
     out.sort((a, b) => a.y - b.y);

@@ -93,31 +93,63 @@ body {
   gap: clamp(16px, 3.2vw, 34px);
 }
 
-.weather-word {
-  translate: 0 4px;
+.weather-word,
+.flavor {
   appearance: none;
   border: 0;
   background: none;
   padding: 4px 0;
-  font: 400 16px/1.2 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font: 400 16px/1.2 "Neue Montreal", ui-sans-serif, -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;
   letter-spacing: 0.005em;
   color: #c2bdb7;
   cursor: pointer;
   transition: color 240ms ease;
 }
 
-.weather-word:hover {
+.weather-word {
+  translate: 0 4px;
+  font-size: 15px;
+}
+
+.weather-word:hover,
+.flavor:hover {
   color: #8f8a84;
 }
 
-.weather-word.is-on {
+.weather-word.is-on,
+.flavor[aria-pressed="true"] {
   color: #5f5a55;
 }
 
-.weather-word:focus-visible {
+.weather-word:focus-visible,
+.flavor:focus-visible {
   outline: none;
   text-decoration: underline;
   text-underline-offset: 4px;
+}
+
+.flavors {
+  position: fixed;
+  bottom: max(4px, env(safe-area-inset-bottom));
+  left: 50%;
+  translate: -50% 0;
+  display: flex;
+  gap: 18px;
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 900ms ease 400ms;
+}
+
+.is-ready .flavors {
+  opacity: 1;
+  visibility: visible;
+}
+
+.flavor {
+  min-height: 32px;
+  font-size: 14px;
+  color: #756f69;
 }
 
 @media (max-width: 520px) {
@@ -125,13 +157,13 @@ body {
     gap: clamp(6px, 2vw, 12px);
   }
   .weather-word {
-    font-size: 14px;
+    font-size: 13px;
   }
 }
 
 @media (max-width: 360px) {
   .weather-word {
-    font-size: 13px;
+    font-size: 12.5px;
   }
 }
 
@@ -199,6 +231,7 @@ noscript .fallback,
 }
 
 .no-webgl .controls,
+.no-webgl .flavors,
 .no-webgl .reset,
 .no-webgl #scene {
   display: none;
@@ -207,6 +240,7 @@ noscript .fallback,
 @media (prefers-reduced-motion: reduce) {
   #scene,
   .controls,
+  .flavors,
   .reset {
     transition: none;
   }

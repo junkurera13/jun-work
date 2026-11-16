@@ -6,10 +6,10 @@ export const MELT_SECONDS = 540;
 /**
  * Turns a single melt progress value P (0 = straight from the freezer,
  * 1 = only the stick is left) into all of the shape / material parameters.
- * The vanilla inside starts going first; the chocolate shell follows a little
- * behind, so they never melt in lockstep but never drift far apart either.
+ * Magic Choc: the vanilla inside starts going first; the chocolate shell follows
+ * a little behind. Faluda: the rose ice runs first and the vanilla holds on.
  */
-export function meltParams(P) {
+export function meltParams(P, faluda = false) {
   const f = Math.pow(smoothstep(0.08, 1.0, P), 1.25);
   // the top slumps, but never squashes flat: the last of the ice cream stays
   // a rounded lump that shrinks onto the stick and melts away
@@ -18,15 +18,20 @@ export function meltParams(P) {
   const bulge = 0.1 * smoothstep(0.1, 0.7, P) * (1 - smoothstep(0.7, 0.9, P));
   return {
     P,
+    faluda,
     sag,
     erode,
     bulge,
     taper: 0.42 * smoothstep(0.15, 0.85, P),
     morph: 0.85 * smoothstep(0.1, 0.75, P),
     shrink: 0.68 * smoothstep(0.5, 0.97, P),
-    meltV: smoothstep(0.0, 0.8, P),
-    meltC: smoothstep(0.12, 0.92, P),
-    chocGone: 1.1 * smoothstep(0.38, 1.0, P),
+    // Magic Choc: the vanilla goes first and the thin chocolate follows.
+    // Faluda: the other way round. The rose ice is outside, meets the warm
+    // air first and turns straight into runny syrup; the vanilla inside is
+    // insulated by it and its fat and air hold their shape for longer.
+    meltV: faluda ? smoothstep(0.2, 0.95, P) : smoothstep(0.0, 0.8, P),
+    meltC: faluda ? smoothstep(0.0, 0.7, P) : smoothstep(0.12, 0.92, P),
+    chocGone: faluda ? 1.1 * smoothstep(0.26, 0.86, P) : 1.1 * smoothstep(0.38, 1.0, P),
     stickK: 0.16 * smoothstep(0.3, 0.6, P) * (1 - smoothstep(0.96, 1.0, P)),
     wet: smoothstep(0.4, 0.75, P),
   };
