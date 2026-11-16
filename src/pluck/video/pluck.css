@@ -1,0 +1,882 @@
+/*
+ * Pluck — a skin with one moving part.
+ *
+ * The timeline is a string held taut across the player. It is pinned at both ends and at every chapter mark. The
+ * pointer bends it, dragging pulls it, and when you let go it rings and settles the way a plucked string does.
+ * The rest of the player is the same instrument: a pick to start, a second string for volume, frets for chapters,
+ * a serif for names and a tuner's mono for numbers.
+ *
+ * `<pluck-string>` draws the string; see `pluck-string.ts`. The standard time slider underneath does the work.
+ */
+
+.media-skin[data-theme="pluck"] {
+  --pluck-accent: var(--media-accent-color, oklch(0.87 0.17 92));
+  --pluck-accent-ink: var(--media-accent-text-color, #17130a);
+  --pluck-line: 1.8;
+  --pluck-surface: rgb(22 22 24);
+  --pluck-hairline: rgb(255 255 255 / 0.12);
+  --pluck-soft: rgb(255 255 255 / 0.68);
+  --pluck-hover: rgb(255 255 255 / 0.16);
+  --pluck-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --pluck-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --pluck-gutter: calc(var(--media-spacing) * 4);
+  --pluck-radius: calc(var(--media-spacing) * 4);
+  --pluck-serif: "Instrument Serif", ui-serif, Georgia, serif;
+  --pluck-mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --pluck-pick: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 108'%3E%3Cpath d='M50 104C40 92 4 60 4 32C4 12 24 4 50 4C76 4 96 12 96 32C96 60 60 92 50 104Z'/%3E%3C/svg%3E");
+
+  --media-video-border-radius: var(--media-border-radius, 0px);
+  --media-caption-controls-y: calc(var(--media-spacing) * -24);
+  --media-ring: #fff;
+
+  font-family: var(--media-font-family, "Figtree Variable", Figtree, ui-rounded, system-ui, -apple-system, sans-serif);
+  font-size: calc(var(--media-spacing) * 3.25);
+  font-weight: 500;
+  line-height: 1.2;
+  -webkit-font-smoothing: antialiased;
+}
+
+@supports not (color: oklch(0 0 0)) {
+  .media-skin[data-theme="pluck"] {
+    --pluck-accent: var(--media-accent-color, #f5cf3b);
+  }
+}
+
+@container media-root (width < 28rem) {
+  .media-skin[data-theme="pluck"] {
+    --pluck-gutter: calc(var(--media-spacing) * 2.5);
+  }
+}
+
+@scope (.media-skin[data-theme="pluck"][data-preset="video"]) {
+  /* Scrim: sized to the controls, so small players are covered as well as large ones. */
+  .video-controls-backdrop {
+    background-image:
+      linear-gradient(
+        to top,
+        rgb(0 0 0 / 0.84),
+        rgb(0 0 0 / 0.7) calc(var(--media-spacing) * 14),
+        rgb(0 0 0 / 0.56) calc(var(--media-spacing) * 24),
+        rgb(0 0 0 / 0.24) calc(var(--media-spacing) * 36),
+        rgb(0 0 0 / 0) calc(var(--media-spacing) * 52)
+      ),
+      linear-gradient(to bottom, rgb(0 0 0 / 0.62), rgb(0 0 0 / 0.3) calc(var(--media-spacing) * 12), rgb(0 0 0 / 0) calc(var(--media-spacing) * 24));
+  }
+
+  @media (prefers-contrast: more), (prefers-reduced-transparency: reduce) {
+    .video-controls-backdrop {
+      background-image:
+        linear-gradient(to top, rgb(0 0 0 / 0.94) calc(var(--media-spacing) * 22), rgb(0 0 0 / 0) calc(var(--media-spacing) * 40)),
+        linear-gradient(to bottom, rgb(0 0 0 / 0.9), rgb(0 0 0 / 0) calc(var(--media-spacing) * 22));
+    }
+  }
+
+  /* Layout. */
+  .video-controls-bottom {
+    gap: 0;
+    padding: 0 var(--pluck-gutter) calc(var(--pluck-gutter) * 0.75);
+    background: none;
+    transition: opacity 240ms var(--pluck-ease);
+  }
+
+  .video-controls-top {
+    gap: var(--media-spacing);
+    padding: calc(var(--pluck-gutter) * 0.75) var(--pluck-gutter);
+    background: none;
+    transition: opacity 240ms var(--pluck-ease);
+  }
+
+  .video-controls-row {
+    gap: calc(var(--media-spacing) * 2);
+    margin-inline: calc(var(--media-spacing) * -2);
+  }
+
+  .video-controls-group {
+    gap: calc(var(--media-spacing) * 0.5);
+  }
+
+  /* Buttons. */
+  .media-button {
+    width: calc(var(--media-spacing) * 9);
+    height: calc(var(--media-spacing) * 9);
+    border-radius: 50%;
+    background: none;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    transition:
+      background-color 160ms linear,
+      scale 220ms var(--pluck-spring);
+  }
+
+  @media (pointer: coarse) {
+    .media-button {
+      width: calc(var(--media-spacing) * 11);
+      height: calc(var(--media-spacing) * 11);
+    }
+  }
+
+  @media (hover: hover) {
+    .media-button:hover {
+      background: var(--pluck-hover);
+    }
+  }
+
+  .media-button:focus-visible,
+  .media-button[aria-expanded="true"] {
+    background: var(--pluck-hover);
+  }
+
+  .media-button:active {
+    scale: 0.9;
+  }
+
+  .media-button:focus-visible,
+  .media-time-toggle:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: 1px;
+    box-shadow: 0 0 0 5px rgb(0 0 0 / 0.55);
+  }
+
+  .media-button-icon,
+  .media-button-icon-base {
+    width: calc(var(--media-spacing) * 6);
+    height: calc(var(--media-spacing) * 6);
+    filter: drop-shadow(0 1px 1.5px rgb(0 0 0 / 0.4));
+  }
+
+  .media-skin svg,
+  :scope svg {
+    stroke-width: var(--pluck-line);
+  }
+
+  .media-button svg {
+    overflow: visible;
+  }
+
+  /* On is the accent, so state never depends on a shape change alone. */
+  .media-captions-button[data-active],
+  .media-pip-button[data-pip],
+  .media-airplay-button[data-airplay-state="connected"],
+  .media-cast-button[data-cast-state="connected"] {
+    color: var(--pluck-accent);
+  }
+
+  /* Time. */
+  .media-time-group {
+    height: auto;
+    gap: 0.45em;
+    padding-inline: calc(var(--media-spacing) * 1.5);
+    font-family: var(--pluck-mono);
+    font-size: calc(var(--media-spacing) * 3);
+    font-variant-numeric: tabular-nums slashed-zero;
+    letter-spacing: 0.02em;
+    text-shadow: 0 1px 2px rgb(0 0 0 / 0.45);
+  }
+
+  .media-time-current-value,
+  .media-time-toggle {
+    font-weight: 600;
+  }
+
+  .media-time-duration-value,
+  .media-time-separator {
+    color: var(--pluck-soft);
+    opacity: 1;
+  }
+
+  .media-time-toggle {
+    border-radius: calc(var(--media-spacing) * 1);
+  }
+
+  /* -----------------------------------------------------------------------------------------------------------
+   * The string.
+   * --------------------------------------------------------------------------------------------------------- */
+  .media-time-slider {
+    display: block;
+    height: calc(var(--media-spacing) * 11);
+    touch-action: none;
+  }
+
+  .pluck-string {
+    position: absolute;
+    inset: 0;
+    display: block;
+    pointer-events: none;
+  }
+
+  .pluck-string-svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.5));
+  }
+
+  /* Ahead of the playhead: plain steel. */
+  .pluck-string-rest {
+    stroke: rgb(255 255 255 / 0.64);
+    stroke-width: 1.6;
+  }
+
+  .pluck-string-buffer {
+    stroke: rgb(255 255 255 / 0.86);
+    stroke-width: 1.6;
+  }
+
+  /* Behind it: a wound string, bronze with its winding showing. */
+  .pluck-string-played {
+    stroke: var(--pluck-accent);
+    stroke-width: 4.2;
+  }
+
+  .pluck-string-winding {
+    stroke: rgb(0 0 0 / 0.42);
+    stroke-width: 4.2;
+    stroke-linecap: butt;
+    stroke-dasharray: 0.9 1.5;
+  }
+
+  /* A fret at every chapter; the nut and the saddle at the ends. */
+  .pluck-string-fret {
+    stroke: rgb(255 255 255 / 0.72);
+    stroke-width: 2;
+  }
+
+  .pluck-string-end {
+    stroke: #fff;
+    stroke-width: 3;
+  }
+
+  /* The playhead is a slide resting on the string. */
+  .pluck-string-slide {
+    fill: #fff;
+    stroke: rgb(0 0 0 / 0.3);
+    stroke-width: 1;
+    transform-box: fill-box;
+    transform-origin: center;
+    transition: scale 260ms var(--pluck-spring);
+  }
+
+  .media-time-slider:is([data-pointing], [data-dragging]) .pluck-string-slide,
+  .media-volume-slider:is([data-pointing], [data-dragging]) .pluck-string-slide {
+    scale: 1.2;
+  }
+
+  .media-time-slider[data-dragging] .pluck-string-slide {
+    scale: 1.35;
+  }
+
+  /* Chapters stay in the tree for their state; the string draws them. */
+  .media-time-slider-chapters {
+    position: absolute;
+    inset: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  /* The real thumb only carries keyboard focus, as a ring around the slide. */
+  .media-time-slider-thumb {
+    top: 50%;
+    left: var(--media-slider-fill, 0%);
+    width: calc(var(--media-spacing) * 4);
+    height: calc(var(--media-spacing) * 6);
+    border: 0;
+    border-radius: 999px;
+    background: none;
+    transform: translate(-50%, -50%);
+  }
+
+  .media-time-slider[data-dragging] .media-time-slider-thumb {
+    left: var(--media-slider-pointer, 0%);
+  }
+
+  .media-time-slider-thumb:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: 0;
+    box-shadow: 0 0 0 4px rgb(0 0 0 / 0.55);
+  }
+
+  .media-time-slider[data-disabled] {
+    opacity: 0.5;
+  }
+
+  /* Preview. */
+  .media-time-slider-preview {
+    bottom: calc(100% + var(--media-spacing) * 1);
+    max-width: calc(var(--media-spacing) * 56);
+    gap: calc(var(--media-spacing) * 1.5);
+    transition: opacity 140ms linear;
+  }
+
+  .media-slider-thumbnail {
+    border-radius: calc(var(--media-spacing) * 2.5);
+    background: #000;
+    box-shadow:
+      0 0 0 1px rgb(255 255 255 / 0.2),
+      0 10px 28px rgb(0 0 0 / 0.45);
+  }
+
+  /* No storyboard, no frame: leave just the time and chapter, never an empty box. */
+  .media-slider-thumbnail:is([data-hidden], [data-error]) {
+    display: none;
+  }
+
+  .media-time-slider-preview-meta {
+    width: auto;
+    padding: calc(var(--media-spacing) * 1.25) calc(var(--media-spacing) * 2.5);
+    border-radius: 999px;
+    background: var(--pluck-surface);
+    box-shadow: 0 0 0 1px var(--pluck-hairline);
+  }
+
+  .media-time-slider-preview-label {
+    display: flex;
+    align-items: baseline;
+    gap: 0.6em;
+    white-space: nowrap;
+  }
+
+  .media-time-slider-value {
+    font-family: var(--pluck-mono);
+    font-size: 0.92em;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums slashed-zero;
+  }
+
+  .media-time-slider-chapter-title {
+    color: #fff;
+    font-family: var(--pluck-serif);
+    font-size: 1.22em;
+    font-style: italic;
+    font-weight: 400;
+    opacity: 1;
+  }
+
+  /* The note this span would ring at, as a tuner shows it. */
+  .pluck-note {
+    color: var(--pluck-accent);
+    font-family: var(--pluck-mono);
+    font-size: 0.85em;
+    font-weight: 600;
+  }
+
+  .pluck-note:empty {
+    display: none;
+  }
+
+  .pluck-note::before {
+    content: "♪ ";
+    opacity: 0.8;
+  }
+
+  /* Center play. */
+  .video-controls-center {
+    inset: 0;
+    display: grid;
+    place-items: center;
+    pointer-events: none;
+    transform: none;
+    background: none;
+    padding: 0;
+  }
+
+  .video-controls-content[data-started] .video-controls-center {
+    display: none;
+  }
+
+  /* The big play button is a guitar pick. */
+  .pluck-center-play {
+    --pluck-pick-tilt: -6deg;
+    position: relative;
+    isolation: isolate;
+    pointer-events: auto;
+    width: calc(var(--media-spacing) * 18);
+    height: calc(var(--media-spacing) * 19.5);
+    border-radius: 0;
+    background: none;
+    color: var(--pluck-accent-ink);
+    filter: drop-shadow(0 6px 14px rgb(0 0 0 / 0.38));
+    rotate: var(--pluck-pick-tilt);
+    transition:
+      rotate 320ms var(--pluck-spring),
+      scale 220ms var(--pluck-spring);
+  }
+
+  .pluck-center-play::before,
+  .pluck-center-play::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    -webkit-mask: var(--pluck-pick) center / contain no-repeat;
+    mask: var(--pluck-pick) center / contain no-repeat;
+  }
+
+  /* Face of the pick, with a little celluloid sheen. */
+  .pluck-center-play::before {
+    z-index: -1;
+    background:
+      radial-gradient(120% 80% at 30% 18%, rgb(255 255 255 / 0.38), rgb(255 255 255 / 0) 55%),
+      var(--pluck-accent);
+  }
+
+  /* Focus ring, cut to the pick's shape. */
+  .pluck-center-play::after {
+    z-index: -2;
+    inset: calc(var(--media-spacing) * -2);
+    background: #fff;
+    opacity: 0;
+  }
+
+  .pluck-center-play:focus-visible {
+    outline: 0;
+    box-shadow: none;
+    background: none;
+    /* A dark edge outside the white ring, so focus shows over bright footage too. */
+    filter: drop-shadow(0 0 1px #000) drop-shadow(0 0 1px #000) drop-shadow(0 6px 14px rgb(0 0 0 / 0.38));
+  }
+
+  .pluck-center-play:focus-visible::after {
+    opacity: 1;
+  }
+
+  .pluck-center-play:hover,
+  .pluck-center-play:focus-visible {
+    --pluck-pick-tilt: 4deg;
+    background: none;
+    scale: 1.06;
+  }
+
+  .pluck-center-play:active {
+    scale: 0.94;
+  }
+
+  .pluck-center-play-icon {
+    width: calc(var(--media-spacing) * 8) !important;
+    height: calc(var(--media-spacing) * 8) !important;
+    margin-bottom: calc(var(--media-spacing) * 2.5);
+    margin-left: calc(var(--media-spacing) * 0.75);
+    filter: none;
+  }
+
+  .pluck-center-play svg {
+    stroke-width: 2.3;
+  }
+
+  @container media-root (width < 22.5rem) {
+    .pluck-center-play {
+      width: calc(var(--media-spacing) * 13);
+      height: calc(var(--media-spacing) * 14);
+    }
+
+    .pluck-center-play-icon {
+      width: calc(var(--media-spacing) * 5.5) !important;
+      height: calc(var(--media-spacing) * 5.5) !important;
+      margin-bottom: calc(var(--media-spacing) * 1.75);
+    }
+  }
+
+  /* Title. */
+  .media-title {
+    padding: calc(var(--media-spacing) * 2) calc(var(--media-spacing) * 1);
+    background: none;
+    font-family: var(--pluck-serif);
+    font-size: calc(var(--media-spacing) * 5.5);
+    font-style: italic;
+    font-weight: 400;
+    line-height: 1;
+    letter-spacing: 0;
+    text-shadow: 0 1px 3px rgb(0 0 0 / 0.5);
+    transition: opacity 240ms var(--pluck-ease);
+  }
+
+  /* Indicators and buffering. */
+  .media-indicator {
+    gap: 0.5em;
+    padding: calc(var(--media-spacing) * 2) calc(var(--media-spacing) * 3.5);
+    border-radius: 999px;
+    background: var(--pluck-surface);
+    box-shadow: 0 0 0 1px var(--pluck-hairline);
+    font-weight: 650;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .media-buffering-indicator-spinner-icon {
+    width: calc(var(--media-spacing) * 10);
+    height: calc(var(--media-spacing) * 10);
+    color: var(--pluck-accent);
+    filter: drop-shadow(0 1px 3px rgb(0 0 0 / 0.5));
+  }
+
+  /* Popups. */
+  .media-tooltip-popup,
+  .media-volume-popover-popup,
+  .media-menu-popup,
+  .media-dialog-popup {
+    background: var(--pluck-surface);
+    color: #fff;
+    border-radius: var(--pluck-radius);
+    box-shadow:
+      0 0 0 1px var(--pluck-hairline),
+      0 14px 40px rgb(0 0 0 / 0.5);
+    outline: 0;
+  }
+
+  .media-popup {
+    transition:
+      opacity 150ms linear,
+      scale 260ms var(--pluck-spring),
+      transform 260ms var(--pluck-spring);
+  }
+
+  .media-popup:is([data-starting-style], [data-ending-style]) {
+    filter: none;
+  }
+
+  .media-popup[data-ending-style] {
+    transition:
+      opacity 110ms linear,
+      scale 110ms var(--pluck-ease),
+      transform 110ms var(--pluck-ease);
+  }
+
+  .media-tooltip-popup {
+    --media-tooltip-side-offset: calc(var(--media-spacing) * 11);
+    padding: calc(var(--media-spacing) * 1.5) calc(var(--media-spacing) * 2.5);
+    border-radius: 999px;
+    font-size: calc(var(--media-spacing) * 3);
+    font-weight: 600;
+  }
+
+  .media-tooltip-popup[data-open] {
+    gap: 0.6em;
+  }
+
+  .media-tooltip-screen-popup {
+    --media-tooltip-side-offset: calc(var(--media-spacing) * 2) !important;
+  }
+
+  .media-tooltip-shortcut {
+    min-width: 0;
+    padding: 0;
+    background: none;
+    color: var(--pluck-soft);
+    font-size: inherit;
+  }
+
+  .media-tooltip-shortcut:empty {
+    display: none;
+  }
+
+  /* Volume: a second, shorter string, stood on end. Louder is tighter, so it rings faster and higher. */
+  .media-volume-popover-popup {
+    --media-popover-side-offset: calc(var(--media-spacing) * 11);
+    width: calc(var(--media-spacing) * 12);
+    height: calc(var(--media-spacing) * 38);
+    padding: calc(var(--media-spacing) * 5) 0;
+    border-radius: 999px;
+  }
+
+  .media-volume-slider {
+    --media-accent: var(--pluck-accent);
+    position: relative;
+    width: 100%;
+    touch-action: none;
+  }
+
+  .media-volume-slider-track {
+    visibility: hidden;
+  }
+
+  .pluck-volume-string {
+    position: absolute;
+    inset: 0;
+    display: block;
+    pointer-events: none;
+  }
+
+  .media-volume-slider-thumb {
+    width: calc(var(--media-spacing) * 6);
+    height: calc(var(--media-spacing) * 3.5);
+    border-radius: 999px;
+    background: none;
+    box-shadow: none;
+  }
+
+  .media-volume-slider-thumb:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: 2px;
+  }
+
+  /* String sound toggle. */
+  .pluck-sound {
+    display: contents;
+  }
+
+  .pluck-sound-button .pluck-sound-on-icon,
+  .pluck-sound-button[data-active] .pluck-sound-off-icon {
+    display: none;
+  }
+
+  .pluck-sound-button[data-active] .pluck-sound-on-icon {
+    display: block;
+  }
+
+  .pluck-sound-button[data-active] {
+    color: var(--pluck-accent);
+  }
+
+  /* Menus. */
+  .media-menu-popup {
+    --media-popover-side-offset: calc(var(--media-spacing) * 11);
+    min-width: calc(var(--media-spacing) * 52);
+    font-size: calc(var(--media-spacing) * 3.25);
+  }
+
+  .media-menu-content {
+    padding: calc(var(--media-spacing) * 1.5);
+    gap: 0 !important;
+  }
+
+  .media-menu-radio-group {
+    gap: 0;
+  }
+
+  .media-menu-item,
+  .media-menu-back-item,
+  .media-menu-radio-item {
+    min-height: calc(var(--media-spacing) * 9);
+    gap: calc(var(--media-spacing) * 2.5);
+    padding-inline: calc(var(--media-spacing) * 2.5);
+    border-radius: calc(var(--pluck-radius) - var(--media-spacing) * 1.5);
+    background: none;
+    outline: 0;
+  }
+
+  .media-menu-item[data-highlighted],
+  .media-menu-back-item[data-highlighted],
+  .media-menu-radio-item[data-highlighted] {
+    background: var(--pluck-hover);
+  }
+
+  .media-menu-item:focus-visible,
+  .media-menu-back-item:focus-visible,
+  .media-menu-radio-item:focus-visible {
+    background: var(--pluck-hover);
+    outline: 2px solid #fff;
+    outline-offset: -2px;
+  }
+
+  .media-menu-back-item {
+    font-family: var(--pluck-serif);
+    font-size: 1.3em;
+    font-style: italic;
+    font-weight: 400;
+  }
+
+  .media-menu-separator {
+    display: block;
+    height: 1px;
+    margin: calc(var(--media-spacing) * 1.5) calc(var(--media-spacing) * 2.5);
+    background: var(--pluck-hairline);
+    flex-shrink: 0;
+  }
+
+  .media-menu-hint {
+    color: var(--pluck-soft);
+    opacity: 1;
+  }
+
+  .media-menu-trigger-icon,
+  .media-menu-back-chevron,
+  .media-menu-forward-chevron,
+  .media-menu-tier {
+    opacity: 1;
+  }
+
+  .media-menu-radio-icon {
+    color: var(--pluck-accent);
+    opacity: 1;
+  }
+
+  .media-menu-radio-item[aria-checked="true"] {
+    font-weight: 650;
+  }
+
+  .media-menu-radio-item[data-custom] {
+    font-style: normal;
+  }
+
+  .media-menu-badge {
+    padding: 0.15em 0.5em;
+    border-radius: 999px;
+    background: rgb(255 255 255 / 0.14);
+    font-size: 0.8em;
+    font-weight: 650;
+  }
+
+  /* Dialog. */
+  .media-dialog-popup {
+    border-radius: calc(var(--pluck-radius) * 1.25);
+    line-height: 1.4;
+  }
+
+  .media-dialog-title {
+    font-size: calc(var(--media-spacing) * 4.5);
+    font-weight: 700;
+  }
+
+  .media-dialog-description {
+    color: var(--pluck-soft);
+  }
+
+  .media-dialog-close {
+    width: auto;
+    height: calc(var(--media-spacing) * 9);
+    padding-inline: calc(var(--media-spacing) * 4.5);
+    border: 0 !important;
+    border-radius: 999px;
+    background: var(--pluck-accent);
+    color: var(--pluck-accent-ink);
+    font-weight: 650;
+  }
+
+  .media-dialog-close:hover,
+  .media-dialog-close:focus-visible {
+    background: var(--pluck-accent);
+  }
+
+  /* Small players. */
+  @container media-root (width < 30rem) {
+    .media-pip-button {
+      display: none;
+    }
+  }
+
+  @container media-root (width < 19rem) {
+    .pluck-sound-button {
+      display: none !important;
+    }
+  }
+
+  @container media-root (width < 22rem) {
+    .media-time-duration-value,
+    .media-time-separator {
+      display: none;
+    }
+  }
+
+  @container media-root (width < 17rem) {
+    .media-captions-button,
+    .media-settings-button {
+      display: none;
+    }
+  }
+
+  @container media-root (width < 12rem) {
+    .media-mute-button,
+    .media-time-group {
+      display: none;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .media-button,
+    .pluck-string-slide,
+    .media-volume-slider-thumb,
+    .media-popup {
+      transition: none;
+    }
+
+    .pluck-center-play {
+      rotate: none;
+    }
+
+    .media-button:active,
+    .pluck-center-play:hover,
+    .pluck-center-play:focus-visible {
+      scale: none;
+    }
+  }
+}
+
+@media (forced-colors: active) {
+  @scope (.media-skin[data-theme="pluck"][data-preset="video"]) {
+    .video-controls-backdrop {
+      background: none;
+    }
+
+    .video-controls-bottom {
+      background: Canvas;
+    }
+
+    .pluck-string-svg {
+      filter: none;
+    }
+
+    .pluck-string-rest {
+      stroke: GrayText;
+    }
+
+    .pluck-string-buffer {
+      stroke: CanvasText;
+    }
+
+    .pluck-string-played {
+      stroke: Highlight;
+    }
+
+    .pluck-string-slide {
+      fill: CanvasText;
+    }
+
+    .pluck-string-fret,
+    .pluck-string-end {
+      stroke: CanvasText;
+    }
+
+    .pluck-string-winding {
+      stroke: none;
+    }
+
+    .pluck-center-play::before {
+      background: ButtonText;
+    }
+
+    .media-button {
+      border: 0;
+      background: none;
+      color: CanvasText;
+    }
+
+    .media-button:focus-visible,
+    .media-time-slider-thumb:focus-visible {
+      outline: 2px solid Highlight;
+      box-shadow: none;
+    }
+
+    .pluck-center-play {
+      color: ButtonFace;
+      filter: none;
+    }
+
+    .media-menu-item[data-highlighted],
+    .media-menu-back-item[data-highlighted],
+    .media-menu-radio-item[data-highlighted] {
+      background: Highlight;
+      color: HighlightText;
+    }
+
+    .media-tooltip-popup,
+    .media-volume-popover-popup,
+    .media-menu-popup,
+    .media-dialog-popup,
+    .media-time-slider-preview-meta,
+    .media-indicator {
+      box-shadow: none;
+      border: 1px solid CanvasText;
+    }
+  }
+}

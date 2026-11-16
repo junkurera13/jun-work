@@ -1,0 +1,117 @@
+/* The Pluck project page. White like the home page; the player is the only dark thing on it. */
+
+:root {
+  --ink: #1a1a1a;
+  --muted: #8a8a8a;
+  --line: #e4e4e4;
+  color-scheme: light;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: #fff;
+  color: var(--ink);
+}
+
+body {
+  font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: inherit;
+  text-decoration-color: var(--line);
+  text-underline-offset: 3px;
+}
+
+a:hover {
+  text-decoration-color: currentColor;
+}
+
+a:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+.pp-header {
+  padding: 20px max(16px, env(safe-area-inset-left)) 0;
+  max-width: 1040px;
+  margin: 0 auto;
+}
+
+.pp-home {
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.pp-main {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 56px 16px 80px;
+}
+
+.pp-intro {
+  margin-bottom: 28px;
+}
+
+.pp-intro h1 {
+  margin: 0;
+  font-family: "Instrument Serif", ui-serif, Georgia, serif;
+  font-size: clamp(48px, 9vw, 88px);
+  font-style: italic;
+  font-weight: 400;
+  line-height: 0.95;
+  letter-spacing: -0.01em;
+}
+
+.pp-lede {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 17px;
+}
+
+.pp-player {
+  overflow: hidden;
+  border-radius: 14px;
+  background: #000;
+  box-shadow: 0 24px 60px -24px rgb(0 0 0 / 0.35);
+}
+
+.pp-player video-player,
+.pp-player media-i18n {
+  display: block;
+}
+
+.pp-notes {
+  max-width: 620px;
+  margin-top: 36px;
+}
+
+.pp-notes p {
+  margin: 0 0 14px;
+}
+
+.pp-meta {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+@media (max-width: 600px) {
+  .pp-main {
+    padding-top: 36px;
+  }
+
+  .pp-player {
+    border-radius: 10px;
+  }
+}

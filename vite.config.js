@@ -8,6 +8,7 @@ export default defineConfig({
       input: {
         main: resolve(import.meta.dirname, "index.html"),
         archive: resolve(import.meta.dirname, "archive/index.html"),
+        pluck: resolve(import.meta.dirname, "pluck/index.html"),
       },
     },
   },
