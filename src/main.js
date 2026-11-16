@@ -43,6 +43,7 @@ const state = {
   flavor: 0,
   faluda: FLAVORS[0].faluda,
   mould: FLAVORS[0].mould ?? 0,
+  white: !!FLAVORS[0].white,
   weather: WEATHER_DEFAULT,
   // eased blend of the weathers (for the painted sky, light and melt speed)
   weatherW: WEATHERS.map((_, i) => (i === WEATHER_DEFAULT ? 1 : 0)),
@@ -177,7 +178,7 @@ function pick(clientX, clientY) {
   });
   const ro = world.worldToObj(cam.pos.x, cam.pos.y, cam.pos.z);
   const rd = world.worldDirToObj(dw.x, dw.y, dw.z);
-  const M = meltParams(state.P, state.faluda, state.mould);
+  const M = meltParams(state.P, state.faluda, state.mould, state.white);
   let t = cam.D - 12;
   for (let i = 0; i < 140; i++) {
     const x = ro.x + rd.x * t;
@@ -334,6 +335,7 @@ function selectFlavor(i) {
   state.flavor = i;
   state.faluda = flavor.faluda;
   state.mould = flavor.mould ?? 0;
+  state.white = !!flavor.white;
   audio.material = flavor.shell;
   canvas.setAttribute("aria-label", flavor.label);
   pointer = null;
@@ -355,7 +357,7 @@ const dock = new Dock(dockRoot, {
 // a close-up of the front of the bar, turned and lit just like the big one,
 // so it shows the real thing (the gloss streak on the chocolate, the frost on
 // the rose ice). The page crops it to a circle.
-function renderSwatch(flavor, { x, y, half }) {
+function renderSwatch(flavor, { x, y, half, peel = false }) {
   const px = 96;
   const ss = 2; // supersampled, then scaled down for smooth edges
   const tan = 0.05;
@@ -375,7 +377,8 @@ function renderSwatch(flavor, { x, y, half }) {
       time: 0,
       boundMin: BODY_BOX.min,
       boundMax: BODY_BOX.max,
-      melt: meltParams(0, flavor.faluda, flavor.mould ?? 0),
+      // peel: show what's under the shell (strip it off, as melting does)
+      melt: { ...meltParams(0, flavor.faluda, flavor.mould ?? 0, !!flavor.white), ...(peel ? { chocGone: 1.2 } : {}) },
       cracks: false,
       ooze: 0,
       primCount: 0,
@@ -470,7 +473,7 @@ function frame(now) {
   // melting
   if (state.appear >= 1) state.P = Math.min(1, state.P + (dt * rate) / MELT_SECONDS);
   if (state.P > 0.04) revealReset();
-  const M = meltParams(state.P, state.faluda, state.mould);
+  const M = meltParams(state.P, state.faluda, state.mould, state.white);
 
   // motion
   // the entrance runs on wall-clock time so it never drags on slow devices

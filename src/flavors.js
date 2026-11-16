@@ -49,4 +49,16 @@ export const FLAVORS = [
     swatch: { x: 0.1, y: -1.6, half: 1.5 },
     label: "A strawberry milk ice pop, freckled with crushed strawberries. Press it to leave a soft dent.",
   },
+  {
+    id: "white-blueberry",
+    name: "white choc blueberry",
+    // the Magic Choc bar, dipped in white chocolate, with blueberry yoghurt
+    // ice cream inside: creamy white rippled with purple and berry pieces
+    faluda: false,
+    white: true,
+    shell: "choc",
+    // the picker looks under the white chocolate, at the blueberry ripple
+    swatch: { x: 0.9, y: -1.4, half: 1.4, peel: true },
+    label: "A white chocolate bar with blueberry yoghurt ice cream inside. Tap it to crack the shell.",
+  },
 ];

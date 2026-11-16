@@ -293,6 +293,7 @@ export class Renderer {
     gl.uniform1i(u.uFaluda, M.faluda ? 1 : 0);
     gl.uniform1i(u.uCoco, M.mould === 1 ? 1 : 0);
     gl.uniform1i(u.uBerry, M.mould === 2 ? 1 : 0);
+    gl.uniform1i(u.uWhite, M.white ? 1 : 0);
     gl.uniform1f(u.uSag, M.sag);
     gl.uniform1f(u.uBulge, M.bulge);
     gl.uniform1f(u.uTaper, M.taper);

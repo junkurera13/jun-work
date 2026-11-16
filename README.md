@@ -5,6 +5,8 @@ There's also a passionfruit coconut ice lolly: creamy coconut ice from a grooved
 passionfruit pulp (seeds in their gel and all) that ran down the faces in drips before it froze.
 And a strawberry milk ice pop: a tapered wedge of soft pink milk ice freckled with crushed strawberry. It
 doesn't crack; pressing it leaves soft dents, like firm frozen ice cream.
+The last is the Magic Choc bar again, dipped in white chocolate, with blueberry yoghurt ice cream inside:
+creamy white rippled with purple compote and blueberry pieces.
 Use the flavor buttons below the scene to switch between them.
 
 - **Tap / click** the shell to break it: a patch around your finger snaps into

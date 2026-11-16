@@ -9,7 +9,7 @@ export const MELT_SECONDS = 540;
  * Magic Choc: the vanilla inside starts going first; the chocolate shell follows
  * a little behind. Faluda: the rose ice runs first and the vanilla holds on.
  */
-export function meltParams(P, faluda = false, mould = 0) {
+export function meltParams(P, faluda = false, mould = 0, white = false) {
   // the coconut and strawberry milk lollies are one solid ice all the way through
   const solid = mould > 0;
   const f = Math.pow(smoothstep(0.08, 1.0, P), 1.25);
@@ -22,6 +22,8 @@ export function meltParams(P, faluda = false, mould = 0) {
     P,
     faluda,
     mould,
+    // white chocolate shell over blueberry yoghurt (the Magic Choc bar shape)
+    white,
     sag,
     erode,
     bulge,

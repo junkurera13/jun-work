@@ -13,6 +13,7 @@ uniform mat3 uObjRot;      // object -> world rotation
 uniform float uTime;
 uniform bool uFaluda;
 uniform bool uCoco;      // passionfruit coconut: grooved lolly mould, coconut ice under passionfruit
+uniform bool uWhite;     // white chocolate shell over blueberry yoghurt ice cream (Magic Choc shape)
 uniform bool uBerry;     // strawberry milk: tapered wedge mould, pink milk ice with crushed berries
 uniform bool uThumb;      // picker icon: no backdrop, coverage goes to alpha
 
@@ -537,7 +538,22 @@ Mat mixMat(Mat a, Mat b, float t) {
   return m;
 }
 
+// White chocolate: a creamy ivory, close to the colour of vanilla, just as
+// glossy as the dark shell when frozen and more translucent (it's mostly
+// cocoa butter and milk), softening to a buttery cream as it melts.
+Mat whiteChocolate(vec3 p, float melt) {
+  Mat m;
+  m.albedo = mix(srgb(vec3(0.95, 0.9, 0.77)), srgb(vec3(0.97, 0.91, 0.76)), melt);
+  m.rough = mix(0.14, 0.08, melt) * (0.8 + 0.45 * sn3(p * 2.3 + 9.0));
+  m.sss = 0.3 + 0.3 * melt;
+  m.sssCol = srgb(vec3(1.0, 0.9, 0.7));
+  m.spec = 1.0;
+  m.sheen = 0.0;
+  return m;
+}
+
 Mat chocolate(vec3 p, float melt) {
+  if (uWhite) return whiteChocolate(p, melt);
   Mat m;
   vec3 solid = srgb(vec3(0.275, 0.158, 0.098));
   vec3 soft = srgb(vec3(0.48, 0.3, 0.18));
@@ -801,8 +817,64 @@ Mat vanilla(float melt) {
   return m;
 }
 
+// Blueberry yoghurt ice cream, soft-serve style: a cool creamy white, rippled
+// through with ribbons of blueberry compote (deep purple at their hearts,
+// bleeding out into lilac) and studded with squashed blueberry pieces (dark
+// navy skins, purple flesh at their edges). Reference space, so the ripples
+// ride along with the melting shape.
+Mat blueberryYoghurt(vec3 q, float melt) {
+  Mat m;
+  // warp space so the ripples swirl instead of running in straight bands
+  vec3 w = q + 0.7 * vec3(sn3(q * 0.7 + 1.0), sn3(q * 0.7 + 7.0), sn3(q * 0.7 + 13.0));
+  float band1 = sin(w.y * 1.7 + w.x * 1.2 + 3.6 * sn3(w * 1.1 + 2.0));
+  float band2 = sin(w.x * 2.2 - w.z * 1.6 + w.y * 0.9 + 4.2 * sn3(w * 1.5 + 3.0));
+  // ribbons break up and come and go, like a hand-folded ripple
+  float keep1 = smoothstep(0.28, 0.52, sn3(w * 1.7 + 5.0));
+  float keep2 = smoothstep(0.34, 0.58, sn3(w * 2.1 + 11.0));
+  float rib = max(smoothstep(0.6, 0.9, band1) * keep1, smoothstep(0.72, 0.94, band2) * keep2 * 0.85);
+  float heart = max(smoothstep(0.88, 0.99, band1) * keep1, smoothstep(0.92, 0.995, band2) * keep2);
+  float halo = max(smoothstep(0.05, 0.65, band1) * keep1, smoothstep(0.25, 0.75, band2) * keep2) * (1.0 - rib);
+  // fine streaky striations along the ribbons
+  float streak = vnoise3(w * vec3(9.0, 3.0, 9.0) + 4.0);
+  vec3 c = mix(srgb(vec3(0.93, 0.91, 0.93)), srgb(vec3(0.97, 0.96, 0.95)), sn3(q * 1.3 + 8.0));
+  c = mix(c, srgb(vec3(0.8, 0.67, 0.83)), 0.6 * halo * (0.65 + 0.35 * streak));
+  c = mix(c, srgb(vec3(0.58, 0.3, 0.58)), rib * (0.75 + 0.25 * streak));
+  c = mix(c, srgb(vec3(0.36, 0.1, 0.34)), heart);
+  // blueberry pieces
+  float f = vnoise3(q * 2.7 + 21.0) * 0.62 + vnoise3(q * 7.5 + 4.0) * 0.26 + vnoise3(q * 22.0 + 9.0) * 0.12;
+  float flesh = smoothstep(0.7, 0.725, f);
+  float skin = smoothstep(0.725, 0.77, f);
+  c = mix(c, srgb(vec3(0.42, 0.18, 0.44)), flesh);
+  c = mix(c, srgb(vec3(0.14, 0.11, 0.27)), skin);
+  // melting: wetter, the purple bleeding a little further
+  c = mix(c, c * vec3(0.96, 0.93, 0.97), melt * 0.5);
+  m.albedo = c;
+  m.rough = mix(mix(0.6, 0.35, max(rib, flesh)), 0.13, melt);
+  m.sss = mix(0.5, 0.8, melt) * (1.0 - 0.6 * skin);
+  m.sssCol = srgb(vec3(0.95, 0.86, 1.0));
+  m.spec = mix(0.6, 1.0, max(melt, skin * 0.6));
+  m.sheen = 0.0;
+  return m;
+}
+
+// The ice cream inside a chocolate shell: vanilla, or blueberry yoghurt.
+Mat creamCore(vec3 q, float melt) {
+  if (uWhite) return blueberryYoghurt(q, melt);
+  return vanilla(melt);
+}
+
 Mat fracture() {
   Mat m;
+  if (uWhite) {
+    // freshly snapped white chocolate: matte, creamy and a touch paler
+    m.albedo = srgb(vec3(0.94, 0.89, 0.77));
+    m.rough = 0.75;
+    m.sss = 0.25;
+    m.sssCol = srgb(vec3(1.0, 0.9, 0.7));
+    m.spec = 0.5;
+    m.sheen = 0.0;
+    return m;
+  }
   if (uBerry) {
     m = berryMilk(vec3(0.0), vec3(0.0), 0.0, true);
     return m;
@@ -886,10 +958,10 @@ vec3 shade(vec3 p, vec3 rd, float pix) {
     else if (P.fragSide < 1.5) { m = fracture(); bumpAmp = 0.5; bumpFreq = 30.0; }
     else if (uCoco) { m = cocoIce(p, P.q, n, uMeltC, true); bumpAmp = 0.2; bumpFreq = 22.0; }
     else if (uBerry) { m = berryMilk(p, P.q, uMeltC, true); bumpAmp = 0.2; bumpFreq = 22.0; }
-    else { m = vanilla(0.1); m.albedo *= 0.96; bumpAmp = 0.35; bumpFreq = 22.0; }
+    else { m = creamCore(P.q, 0.1); m.albedo *= 0.96; bumpAmp = 0.35; bumpFreq = 22.0; }
   } else if (P.crumb <= best + 1e-5) {
     m = fracture();
-    m.albedo = mix(m.albedo, srgb(uBerry ? vec3(0.93, 0.6, 0.59) : uCoco ? vec3(0.95, 0.94, 0.9) : uFaluda ? vec3(0.91, 0.17, 0.47) : vec3(0.36, 0.2, 0.11)), 0.5);
+    m.albedo = mix(m.albedo, srgb(uWhite ? vec3(0.93, 0.88, 0.75) : uBerry ? vec3(0.93, 0.6, 0.59) : uCoco ? vec3(0.95, 0.94, 0.9) : uFaluda ? vec3(0.91, 0.17, 0.47) : vec3(0.36, 0.2, 0.11)), 0.5);
     bumpAmp = 0.5; bumpFreq = 25.0;
   } else {
     // body (shell / core), stick, liquid blend
@@ -937,7 +1009,7 @@ vec3 shade(vec3 p, vec3 rd, float pix) {
       bumpAmp = mix(0.12, 0.03, chocLocal); bumpFreq = 21.0;
     } else {
       float vm = clamp(uMeltV * 1.15 + P.fill * 0.6 + P.hole * uMeltV * 0.4, 0.0, 1.0);
-      bm = vanilla(vm);
+      bm = creamCore(P.q, vm);
       bm.albedo *= P.cao;
       bm.spec *= P.cao;
       bumpAmp = mix(0.42, 0.04, vm); bumpFreq = 21.0;
@@ -957,9 +1029,9 @@ vec3 shade(vec3 p, vec3 rd, float pix) {
     seedBump *= 1.0 - wl;
     if (wl > 0.0) {
       Mat lv = vanilla(1.0);
-      lv.albedo = srgb(uBerry ? vec3(0.95, 0.66, 0.65) : uCoco ? vec3(0.97, 0.96, 0.92) : uFaluda ? vec3(0.98, 0.76, 0.8) : vec3(0.99, 0.9, 0.66));
+      lv.albedo = srgb(uWhite ? vec3(0.86, 0.77, 0.88) : uBerry ? vec3(0.95, 0.66, 0.65) : uCoco ? vec3(0.97, 0.96, 0.92) : uFaluda ? vec3(0.98, 0.76, 0.8) : vec3(0.99, 0.9, 0.66));
       Mat lc = shellMaterial(p, P.q, n, 1.0);
-      lc.albedo = srgb(uBerry ? vec3(0.95, 0.66, 0.65) : uCoco ? vec3(0.97, 0.56, 0.03) : uFaluda ? vec3(0.84, 0.1, 0.34) : vec3(0.4, 0.235, 0.135));
+      lc.albedo = srgb(uWhite ? vec3(0.96, 0.91, 0.79) : uBerry ? vec3(0.95, 0.66, 0.65) : uCoco ? vec3(0.97, 0.56, 0.03) : uFaluda ? vec3(0.84, 0.1, 0.34) : vec3(0.4, 0.235, 0.135));
       lc.rough = 0.08;
       Mat lm = mixMat(lv, lc, P.liqC);
       lm.rough = 0.07;
