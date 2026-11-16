@@ -133,10 +133,15 @@ float crackField(vec3 q, out float sink, out float fill, out float inHole, out f
   float crisp = 1.0 - soft;
   // pushed-in plates, plus chipped, rounded lips curling down into each crack
   float lip = 0.045 * smoothstep(0.04, 0.5, near) * (1.0 - smoothstep(0.35, 0.6, t.r)) * crisp;
-  sink = t.b * 0.13 * mix(1.0, 0.5, soft) + lip;
+  // as it melts, the chocolate slumps down into every crack and hole edge
+  // until it meets the vanilla flush: the breaks melt into smooth curves
+  float slump = smoothstep(0.2, 0.55, uMeltC);
+  float rim = SHELL_T * 1.2 * smoothstep(0.0, 0.7, near) * slump;
+  // pushed-in plates level out too, so no steps are left behind
+  sink = t.b * 0.13 * mix(1.0, 0.5, soft) * (1.0 - slump) + lip + rim;
   // the ice cream under the shell follows the plates only softly, so popped
   // neighbouring chips leave one smooth vanilla surface, not steps
-  float smoothSink = textureLod(uCrackTex, uv, 3.0).b * 0.13 * mix(1.0, 0.5, soft);
+  float smoothSink = textureLod(uCrackTex, uv, 3.0).b * 0.13 * mix(1.0, 0.5, soft) * (1.0 - slump);
   // ...but never above a plate that's still there
   float openHole = smoothstep(0.6, 0.9, wide);
   sinkCore = mix(max(smoothSink, sink - 0.5 * SHELL_T), smoothSink, openHole);
@@ -147,7 +152,8 @@ float crackField(vec3 q, out float sink, out float fill, out float inHole, out f
   gapAO = mix(mix(0.72, 0.9, soft), 1.0, smoothstep(0.12, 0.6, near));
   // only right next to an actual crack
   fill = uOoze * smoothstep(0.02, 0.25, near);
-  inHole = step(0.6, t.g) * step(0.9, t.r);
+  // inside a popped-out chip (a wide open area, not a thin crack)
+  inHole = openHole;
   holeEdge = inHole > 0.5 ? -0.2 : 1e5;
   // R crosses 0.5 at the crack edge; a gentle slope keeps the ray marcher
   // from overshooting the crack walls (softer still once it's melting)
@@ -157,8 +163,10 @@ float crackField(vec3 q, out float sink, out float fill, out float inHole, out f
   // enough that rays at any resolution pass through to the ice cream.
   return (0.5 - t.r) * mix(0.01, 0.006, soft)
        + 0.25 * (1.0 - smoothstep(0.0, 0.06, near))
-       - 0.03 * smoothstep(0.3, 0.8, near)
-       - 0.1 * smoothstep(0.6, 1.0, wide);
+       - 0.03 * smoothstep(0.3, 0.8, near) * (1.0 - slump * (1.0 - openHole))
+       - 0.1 * smoothstep(0.6, 1.0, wide)
+       // thin cracks fill in with softened chocolate as it melts (holes stay)
+       + 0.012 * slump * (1.0 - openHole);
 }
 
 void bodyEval(vec3 p, inout Parts P) {
@@ -172,15 +180,22 @@ void bodyEval(vec3 p, inout Parts P) {
   float dCore = dO + tcE;
   float dShell = dO;
   // by the end the shell has melted away and the cracks fade out with it
-  float crackFade = 1.0 - smoothstep(0.72, 0.93, uMeltC);
-  if (uCracks > 0.5 && crackFade > 0.0 && dO < 0.35 && dO > -0.6) {
+  // Melting ice cream is smooth: the marks cracks leave in the vanilla
+  // (deep gaps, ooze lines, sunken patches) melt away first, and the cracks
+  // in the chocolate fade out while the shell is still melting off, well
+  // before the bar is mostly vanilla.
+  float crackFade = 1.0 - smoothstep(0.42, 0.68, uMeltC);
+  float vanillaFade = 1.0 - smoothstep(0.25, 0.5, uMeltC);
+  // (holes need checking until the chocolate itself is gone)
+  if (uCracks > 0.5 && uChocGone < 1.05 && dO < 0.35 && dO > -0.6) {
     float sink, fill, inHole, holeEdge, recess, gapAO, sinkCore;
     float vd = crackField(q, sink, fill, inHole, holeEdge, recess, gapAO, sinkCore);
     sink *= crackFade;
-    sinkCore *= crackFade;
-    recess *= crackFade;
-    fill *= crackFade;
-    vd = mix(0.3, vd, crackFade);
+    sinkCore *= vanillaFade;
+    recess *= vanillaFade;
+    fill *= vanillaFade;
+    // thin cracks close up; popped holes stay open until the chocolate goes
+    vd = mix(0.3, vd, max(crackFade, inHole));
     // the press pushes shell and ice cream in together
     dShell = max(dO + sink, -vd);
     dCore += sinkCore + recess;
@@ -190,7 +205,7 @@ void bodyEval(vec3 p, inout Parts P) {
     P.hole = inHole;
     if (inHole > 0.5) {
       // exposed vanilla in a crushed hole softens and slumps
-      dCore += 0.2 * uMeltV * smoothstep(0.0, 0.4, -holeEdge);
+      dCore += 0.2 * uMeltV * smoothstep(0.0, 0.4, -holeEdge) * vanillaFade;
     }
     if (fill > 0.0) {
       // softened vanilla creeps up *inside* the cracks, a little more as it
@@ -554,8 +569,10 @@ vec3 shade(vec3 p, vec3 rd, float pix) {
     Mat bm;
     if (P.shell <= P.core) {
       if (P.outer + P.sink < -0.008) {
-        bm = fracture();
-        bumpAmp = 0.45; bumpFreq = 32.0;
+        // raw broken edge when frozen; melted, it's just soft chocolate
+        float slumpS = smoothstep(0.2, 0.55, uMeltC);
+        bm = mixMat(fracture(), chocolate(p, chocLocal), slumpS);
+        bumpAmp = 0.45 * (1.0 - slumpS); bumpFreq = 32.0;
       } else {
         bm = chocolate(p, chocLocal);
         bumpAmp = mix(0.05, 0.03, chocLocal); bumpFreq = 1.15;

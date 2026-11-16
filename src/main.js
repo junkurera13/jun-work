@@ -51,9 +51,6 @@ const weather = new WeatherPicker(weatherRoot, {
     state.weather = i;
     audio.tick(0.8 + i * 0.15);
   },
-  onSound: (on) => {
-    audio.muted = !on;
-  },
 });
 
 // --------------------------------------------------------------- camera ----

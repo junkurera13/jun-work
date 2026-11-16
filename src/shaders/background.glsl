@@ -113,8 +113,11 @@ vec3 sceneBrutal(vec2 uv, vec2 q, float t, vec2 sun) {
 vec3 background(vec2 fc) {
   float m = min(uRes.x, uRes.y);
   // the painting sits below the line of weather words
-  vec2 c = vec2(0.5 * uRes.x, 0.5 * (uRes.y - uTopInset));
-  vec2 hs = vec2(0.5 * uRes.x, 0.5 * (uRes.y - uTopInset)) - 0.055 * m;
+  // (a small gap at the top, the usual margin elsewhere)
+  float bot = 0.055 * m;
+  float top = uRes.y - uTopInset - 0.008 * m;
+  vec2 c = vec2(0.5 * uRes.x, 0.5 * (bot + top));
+  vec2 hs = vec2(0.5 * uRes.x - 0.055 * m, 0.5 * (top - bot));
   float r = 0.07 * m;
   float blur = 0.04 * m;
   vec2 q = fc / m;
