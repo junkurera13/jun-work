@@ -15,8 +15,9 @@ export class Liquid {
     this.reset();
   }
 
-  reset(faluda = false) {
+  reset(faluda = false, passion = false) {
     this.faluda = faluda;
+    this.passion = passion;
     this.streams = new Map();
     this.falling = [];
     this.seed();
@@ -66,6 +67,8 @@ export class Liquid {
         feed: (M) => 0.5 + 0.8 * M.meltV,
       });
     }
+    // passionfruit has no vanilla: everything that runs off it is fruit syrup
+    if (this.passion) for (const src of s) src.mat = 1;
     this.sources = s;
   }
 

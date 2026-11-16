@@ -42,6 +42,7 @@ const state = {
   P: 0,
   flavor: 0,
   faluda: FLAVORS[0].faluda,
+  passion: !!FLAVORS[0].passion,
   weather: WEATHER_DEFAULT,
   // eased blend of the weathers (for the painted sky, light and melt speed)
   weatherW: WEATHERS.map((_, i) => (i === WEATHER_DEFAULT ? 1 : 0)),
@@ -176,7 +177,7 @@ function pick(clientX, clientY) {
   });
   const ro = world.worldToObj(cam.pos.x, cam.pos.y, cam.pos.z);
   const rd = world.worldDirToObj(dw.x, dw.y, dw.z);
-  const M = meltParams(state.P, state.faluda);
+  const M = meltParams(state.P, state.faluda, state.passion);
   let t = cam.D - 12;
   for (let i = 0; i < 140; i++) {
     const x = ro.x + rd.x * t;
@@ -306,7 +307,7 @@ function newIceCream() {
   state.yawVel = 0;
   state.pitchVel = 0;
   fracture.reset(state.faluda);
-  liquid.reset(state.faluda);
+  liquid.reset(state.faluda, state.passion);
   canvas.classList.remove("has-cracked");
   cancelAnimationFrame(resetRevealFrame);
   resetRevealFrame = 0;
@@ -325,6 +326,7 @@ function selectFlavor(i) {
   const flavor = FLAVORS[i];
   state.flavor = i;
   state.faluda = flavor.faluda;
+  state.passion = !!flavor.passion;
   audio.material = flavor.shell;
   canvas.setAttribute("aria-label", flavor.label);
   pointer = null;
@@ -366,7 +368,7 @@ function renderSwatch(flavor, { x, y, half }) {
       time: 0,
       boundMin: BODY_BOX.min,
       boundMax: BODY_BOX.max,
-      melt: meltParams(0, flavor.faluda),
+      melt: meltParams(0, flavor.faluda, !!flavor.passion),
       cracks: false,
       ooze: 0,
       primCount: 0,
@@ -461,7 +463,7 @@ function frame(now) {
   // melting
   if (state.appear >= 1) state.P = Math.min(1, state.P + (dt * rate) / MELT_SECONDS);
   if (state.P > 0.04) revealReset();
-  const M = meltParams(state.P, state.faluda);
+  const M = meltParams(state.P, state.faluda, state.passion);
 
   // motion
   // the entrance runs on wall-clock time so it never drags on slow devices

@@ -1,6 +1,8 @@
 # Jun Park
 
 A blank white page with a Magic Choc vanilla ice cream and a Faluda popsicle: a thick wall of frosty rose ice around a vanilla ice cream centre.
+There's also a passionfruit ice lolly: solid golden fruit ice, no ice cream inside, with the black seeds in their
+orange gel frozen all the way through it.
 Use the flavor buttons below the scene to switch between them.
 
 - **Tap / click** the shell to break it: a patch around your finger snaps into

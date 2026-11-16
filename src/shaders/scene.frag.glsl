@@ -12,6 +12,7 @@ uniform float uTanHalfFov;
 uniform mat3 uObjRot;      // object -> world rotation
 uniform float uTime;
 uniform bool uFaluda;
+uniform bool uPassion;   // passionfruit: faluda mould, solid fruit ice with seeds
 uniform bool uThumb;      // picker icon: no backdrop, coverage goes to alpha
 
 uniform vec3 uBoundMin;
@@ -562,7 +563,106 @@ Mat faludaIce(vec3 p, vec3 q, float melt) {
   return m;
 }
 
-Mat shellMaterial(vec3 p, vec3 q, float melt) {
+vec3 hash33(vec3 p) {
+  p = fract(p * vec3(0.1031, 0.1030, 0.0973));
+  p += dot(p, p.yxz + 33.33);
+  return fract((p.xxy + p.yxx) * p.zyx);
+}
+
+// Passionfruit seeds frozen right through the ice. Each one is a flat black
+// teardrop wrapped in a little sac of glossy orange gel. They sit at every
+// depth: the ones just under the surface are sharp and black, deeper ones
+// blur and fade into the golden ice. Reference space, so they ride along
+// with the melting shape. x = seed, y = gel sac, z = how close to the surface.
+const float SEED_CELL = 0.53;
+vec3 passionSeeds(vec3 q, vec3 n) {
+  vec3 cq = q / SEED_CELL;
+  vec3 ci = floor(cq);
+  float seed = 0.0;
+  float gel = 0.0;
+  float near = 0.0;
+  for (int k = 0; k < 27; k++) {
+    vec3 o = vec3(float(k % 3), float((k / 3) % 3), float(k / 9)) - 1.0;
+    vec3 c = ci + o;
+    vec3 h = hash33(c + 17.0);
+    if (h.x > 0.62) continue;                 // not every cell has a seed
+    vec3 ctr = (c + 0.18 + 0.64 * hash33(c * 1.7 + 3.1)) * SEED_CELL;
+    vec3 v = q - ctr;
+    float depth = dot(v, n);                  // > 0: the seed is under the surface
+    if (depth < -0.1 || depth > 0.38) continue;
+    vec3 lat = v - n * depth;
+    float l = length(lat);
+    if (l > 0.42) continue;
+    // a flat teardrop lying at a random angle
+    vec3 a = normalize(hash33(c * 2.3 + 9.0) - 0.5);
+    a = a - n * dot(a, n);
+    a = dot(a, a) > 1e-4 ? normalize(a) : normalize(cross(n, vec3(0.0, 0.0, 1.0)) + 1e-3);
+    float along = dot(lat, a);
+    float across = length(lat - a * along);
+    float size = 0.85 + 0.3 * h.y;
+    float ra = 0.18 * size;
+    float rc = 0.12 * size * (1.0 - 0.3 * clamp(along / ra, -1.0, 1.0));
+    float e = length(vec2(along / ra, across / rc));
+    float dd = max(depth, 0.0);
+    // looked at through the ice, deeper seeds spread out and fade
+    float grow = 1.0 + 0.45 * dd;
+    float soft = 0.1 + 1.1 * dd;
+    float vis = mix(1.0, 0.0, smoothstep(0.03, 0.34, dd));
+    float sd = (1.0 - smoothstep(grow - soft, grow + soft, e)) * vis;
+    seed = max(seed, sd);
+    // the gel sac round it, a little off-centre
+    float gl = length(lat - a * 0.04 * size) / (0.33 * size * (1.0 + 0.6 * dd));
+    gel = max(gel, (1.0 - smoothstep(0.45, 1.0, gl)) * mix(1.0, 0.2, smoothstep(0.0, 0.38, dd)));
+    near = max(near, sd * (1.0 - smoothstep(0.0, 0.12, dd)));
+  }
+  return vec3(seed, gel, near);
+}
+
+// Passionfruit ice: golden pulp frozen solid, cloudy with darker orange
+// streaks of juice, a pale butter-yellow frost on the rims, and the seeds in
+// their gel all through it. Melting, it goes wet, glossy and deeper orange.
+// inner: freshly exposed ice inside a break (no frost, more seeds in view).
+Mat passionIce(vec3 p, vec3 q, vec3 n, float melt, bool inner) {
+  Mat m;
+  float thaw = smoothstep(0.0, 0.5, melt);
+  float cloud = sn3(p * vec3(1.3, 0.55, 1.3) + vec3(2.0, 6.0, 1.0));
+  float cloud2 = vnoise3(p * vec3(5.0, 1.8, 5.0) + 7.0);
+  float tone = clamp(0.45 + 0.9 * (cloud - 0.5) + 0.4 * (cloud2 - 0.5), 0.0, 1.0);
+  vec3 deep = srgb(vec3(0.95, 0.42, 0.0));
+  vec3 gold = srgb(vec3(1.0, 0.6, 0.03));
+  vec3 c = mix(deep, gold, tone);
+  float frost = 0.0;
+  float crystal = 0.0;
+  if (!inner) {
+    float o = faludaOutline(q.xy);
+    float rim = 1.0 - smoothstep(0.25, 1.35, -o);
+    float top = smoothstep(2.6, 5.6, q.y);
+    float patchy = smoothstep(0.25, 0.75, sn3(p * 1.7 + 4.0) * 0.7 + sn3(p * 4.1 + 8.0) * 0.3);
+    frost = clamp(0.04 + 0.4 * rim + 0.1 * top, 0.0, 1.0) * mix(0.55, 1.0, patchy) * (1.0 - thaw);
+    c = mix(c, srgb(vec3(1.0, 0.86, 0.55)), frost * 0.4);
+    crystal = smoothstep(0.9, 0.97, vnoise3(p * 52.0 + 2.0)) * (1.0 - thaw);
+    c = mix(c, srgb(vec3(1.0, 0.95, 0.8)), crystal * 0.4);
+  }
+  c = mix(c, srgb(vec3(0.95, 0.46, 0.02)), thaw * 0.4);
+  // seeds and their gel (frost veils the ones just under the surface a little)
+  vec3 sd = passionSeeds(q, n);
+  float veil = 1.0 - 0.45 * frost;
+  c = mix(c, srgb(vec3(0.88, 0.32, 0.0)), 0.6 * sd.y);
+  c = mix(c, srgb(vec3(0.04, 0.025, 0.012)), clamp(sd.x * 1.15, 0.0, 1.0) * veil);
+  m.albedo = c;
+  float rough = mix(0.34 + 0.24 * frost + 0.1 * crystal, 0.07, thaw);
+  // the gel and the seed coats are glassy smooth
+  rough = mix(rough, 0.1, max(sd.y * 0.6, sd.z) * (1.0 - frost));
+  m.rough = inner ? mix(0.16, 0.07, thaw) : rough;
+  m.sss = 0.85 * (1.0 - 0.75 * sd.x);
+  m.sssCol = srgb(vec3(1.0, 0.62, 0.12));
+  m.spec = mix(0.8, 1.15, max(thaw, sd.z * 0.5));
+  m.sheen = inner ? 0.0 : mix(0.1 + 0.45 * frost, 0.0, thaw);
+  return m;
+}
+
+Mat shellMaterial(vec3 p, vec3 q, vec3 n, float melt) {
+  if (uPassion) return passionIce(p, q, n, melt, false);
   if (uFaluda) return faludaIce(p, q, melt);
   return chocolate(p, melt);
 }
@@ -581,6 +681,16 @@ Mat vanilla(float melt) {
 
 Mat fracture() {
   Mat m;
+  if (uPassion) {
+    // freshly broken fruit ice: paler gold, crystalline and lit from within
+    m.albedo = srgb(vec3(1.0, 0.8, 0.38));
+    m.rough = 0.42;
+    m.sss = 0.9;
+    m.sssCol = srgb(vec3(1.0, 0.66, 0.2));
+    m.spec = 0.9;
+    m.sheen = 0.35;
+    return m;
+  }
   if (uFaluda) {
     // freshly broken ice: paler, crystalline and lit from within
     m.albedo = srgb(vec3(0.98, 0.5, 0.6));
@@ -645,12 +755,13 @@ vec3 shade(vec3 p, vec3 rd, float pix) {
   float chocLocal = clamp(uMeltC * (0.75 + 0.45 * P.hn) + (sn3(p * 0.8 + 2.0) - 0.5) * 0.3 * uMeltC, 0.0, 1.0);
 
   if (P.frag <= best + 1e-5) {
-    if (P.fragSide < 0.5) { m = shellMaterial(p, P.q, uMeltC * 0.8); bumpAmp = 0.06; bumpFreq = 1.6; }
+    if (P.fragSide < 0.5) { m = shellMaterial(p, P.q, n, uMeltC * 0.8); bumpAmp = 0.06; bumpFreq = 1.6; }
     else if (P.fragSide < 1.5) { m = fracture(); bumpAmp = 0.5; bumpFreq = 30.0; }
+    else if (uPassion) { m = passionIce(p, P.q, n, uMeltC, true); bumpAmp = 0.2; bumpFreq = 22.0; }
     else { m = vanilla(0.1); m.albedo *= 0.96; bumpAmp = 0.35; bumpFreq = 22.0; }
   } else if (P.crumb <= best + 1e-5) {
     m = fracture();
-    m.albedo = mix(m.albedo, srgb(uFaluda ? vec3(0.91, 0.17, 0.47) : vec3(0.36, 0.2, 0.11)), 0.5);
+    m.albedo = mix(m.albedo, srgb(uPassion ? vec3(0.98, 0.6, 0.06) : uFaluda ? vec3(0.91, 0.17, 0.47) : vec3(0.36, 0.2, 0.11)), 0.5);
     bumpAmp = 0.5; bumpFreq = 25.0;
   } else {
     // body (shell / core), stick, liquid blend
@@ -659,20 +770,28 @@ vec3 shade(vec3 p, vec3 rd, float pix) {
       if (P.outer + P.sink < -0.008) {
         // raw broken edge when frozen; melted, it's just soft chocolate
         float slumpS = smoothstep(0.2, 0.55, uMeltC);
-        bm = mixMat(fracture(), chocolate(p, chocLocal), slumpS);
+        Mat soft;
+        if (uPassion) soft = passionIce(p, P.q, n, chocLocal, true);
+        else soft = chocolate(p, chocLocal);
+        bm = mixMat(fracture(), soft, slumpS);
         bumpAmp = 0.45 * (1.0 - slumpS); bumpFreq = 32.0;
       } else {
-        bm = shellMaterial(p, P.q, chocLocal);
+        bm = shellMaterial(p, P.q, n, chocLocal);
         bumpAmp = mix(0.05, 0.03, chocLocal); bumpFreq = 1.15;
         bumpAmp2 = (uFaluda ? 0.035 : 0.008) * (1.0 - chocLocal); bumpFreq2 = 46.0;
         if (uFaluda) {
           // ice turns white around a break (stress crazing)
           float craze = smoothstep(0.03, 0.4, P.cnear) * (1.0 - chocLocal);
-          bm.albedo = mix(bm.albedo, srgb(vec3(1.0, 0.8, 0.87)), 0.5 * craze);
+          bm.albedo = mix(bm.albedo, srgb(uPassion ? vec3(1.0, 0.92, 0.7) : vec3(1.0, 0.8, 0.87)), 0.5 * craze);
           bm.rough = mix(bm.rough, 0.55, 0.5 * craze);
           bm.sheen += 0.4 * craze;
         }
       }
+    } else if (uPassion) {
+      // no vanilla in this one: under the outer ice is just more fruit ice
+      bm = passionIce(p, P.q, n, chocLocal, true);
+      bm.albedo *= mix(P.cao, 1.0, 0.5);
+      bumpAmp = mix(0.12, 0.03, chocLocal); bumpFreq = 21.0;
     } else {
       float vm = clamp(uMeltV * 1.15 + P.fill * 0.6 + P.hole * uMeltV * 0.4, 0.0, 1.0);
       bm = vanilla(vm);
@@ -691,9 +810,9 @@ vec3 shade(vec3 p, vec3 rd, float pix) {
     float wl = sminMix(dbs, P.liq, 0.13);
     if (wl > 0.0) {
       Mat lv = vanilla(1.0);
-      lv.albedo = srgb(uFaluda ? vec3(0.98, 0.76, 0.8) : vec3(0.99, 0.9, 0.66));
-      Mat lc = shellMaterial(p, P.q, 1.0);
-      lc.albedo = srgb(uFaluda ? vec3(0.84, 0.1, 0.34) : vec3(0.4, 0.235, 0.135));
+      lv.albedo = srgb(uPassion ? vec3(0.98, 0.58, 0.05) : uFaluda ? vec3(0.98, 0.76, 0.8) : vec3(0.99, 0.9, 0.66));
+      Mat lc = shellMaterial(p, P.q, n, 1.0);
+      lc.albedo = srgb(uPassion ? vec3(0.96, 0.5, 0.02) : uFaluda ? vec3(0.84, 0.1, 0.34) : vec3(0.4, 0.235, 0.135));
       lc.rough = 0.08;
       Mat lm = mixMat(lv, lc, P.liqC);
       lm.rough = 0.07;
@@ -749,7 +868,7 @@ vec3 shade(vec3 p, vec3 rd, float pix) {
   // frost: a pale velvety glow where the surface turns away from you
   if (m.sheen > 0.0) {
     float graze = pow(1.0 - NoV, 2.5);
-    col += m.sheen * srgb(vec3(1.0, 0.86, 0.91)) * graze
+    col += m.sheen * srgb(uPassion ? vec3(1.0, 0.95, 0.8) : vec3(1.0, 0.86, 0.91)) * graze
          * (envIrr(nW) * ao * 0.45 + keyCol * clamp(NoL + 0.3, 0.0, 1.0) * mix(sh, 1.0, 0.4) * 0.22);
   }
   return col;
