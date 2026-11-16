@@ -44,8 +44,8 @@ uniform float uExposure;
 
 #include "common.glsl"
 
-const float TEXT_Y0 = -4.4;
-const float TEXT_Y1 = 1.72;
+const float TEXT_Y0 = -3.0;
+const float TEXT_Y1 = 2.0;
 const int MAX_PRIMS = 64;
 const int MAX_IMPACTS = 16;
 const int MAX_CRUMBS = 24;
@@ -241,12 +241,12 @@ void bodyEval(vec3 p, inout Parts P) {
 
 // --------------------------------------------------------------- stick ----
 
-// Half width along the stick: a waisted paddle. Wide at the rounded end,
-// pinched in through the middle of the handle, wide again where it enters
-// the ice cream (and straight from there up, under the engraving).
+// Half width along a Magnum-style stick. The visible handle starts narrow
+// where it leaves the ice cream and fans out to a broad rounded end; inside
+// the ice cream (hidden until it melts) it widens again into a broad paddle.
 float stickHalfWidth(float y) {
-  float t = (y - STICK_WAIST_Y) / 1.05;
-  return STICK_HW + 0.12 * smoothstep(-7.2, -8.9, y) - 0.18 * exp(-t * t);
+  return 0.62 + 0.33 * smoothstep(STICK_WAIST_Y - 0.15, -8.0, y)
+              + 0.23 * smoothstep(STICK_WAIST_Y + 0.15, -2.6, y);
 }
 
 float sdStickBase(vec3 p) {

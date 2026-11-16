@@ -3,7 +3,8 @@
 // top to bottom, as the ice cream melts off the stick.
 
 export function engravingCanvas() {
-  const W = 192;
+  // maps onto the stick's 1.7 cm width and the 5 cm text band
+  const W = 384;
   const H = 1248;
   const c = document.createElement("canvas");
   c.width = W;
@@ -17,7 +18,7 @@ export function engravingCanvas() {
   g.fillStyle = "#fff";
   g.textAlign = "center";
   g.textBaseline = "middle";
-  g.font = '700 112px "Helvetica Neue", Helvetica, Arial, "Liberation Sans", sans-serif';
+  g.font = '700 128px "Helvetica Neue", Helvetica, Arial, "Liberation Sans", sans-serif';
   g.filter = "blur(2.2px)";
   letters.forEach((ch, i) => {
     if (!ch) return;
@@ -26,7 +27,7 @@ export function engravingCanvas() {
     g.save();
     g.translate(W / 2 + jx * 2, slot * (i + 0.5) + (i > 3 ? -slot * 0.5 : 0) + 4);
     g.rotate(jx * 0.015);
-    g.scale(0.8, 1); // the stick got wider: keep the letters in proportion
+    g.scale(0.9, 1); // keep letters in proportion on the stick
     g.fillText(ch, 0, 0);
     g.restore();
   });

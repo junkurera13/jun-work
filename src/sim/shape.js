@@ -5,11 +5,11 @@
 export const BAR_BOTTOM = -4.8;
 export const BAR_HEIGHT = 9.6;
 export const SHELL_T = 0.08;
-export const STICK_HW = 0.72;
-export const STICK_END_R = 0.84;
+export const STICK_HW = 0.85;
+export const STICK_END_R = 0.95;
 export const STICK_HT = 0.14;
-export const STICK_Y0 = -9.3;
-export const STICK_Y1 = 2.1;
+export const STICK_Y0 = -8.9;
+export const STICK_Y1 = 2.6;
 
 const fract = (x) => x - Math.floor(x);
 const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
@@ -161,11 +161,10 @@ export function bodyOuter(x, y, z, M) {
   return (d / M.sag) * (1 - 0.95 * (M.taper || 0)) * (1 - (M.shrink || 0));
 }
 
-export const STICK_WAIST_Y = -6.8;
+export const STICK_WAIST_Y = -4.75;
 
 export function stickHalfWidth(y) {
-  const t = (y - STICK_WAIST_Y) / 1.05;
-  return STICK_HW + 0.12 * smoothstep(-7.2, -8.9, y) - 0.18 * Math.exp(-t * t);
+  return 0.62 + 0.33 * smoothstep(STICK_WAIST_Y - 0.15, -8.0, y) + 0.23 * smoothstep(STICK_WAIST_Y + 0.15, -2.6, y);
 }
 
 // Waisted paddle stick, mirrors sdStickBase in scene.frag.glsl
