@@ -3,13 +3,14 @@
 // liquid simulation glued to the melting surface.
 
 export const BAR_BOTTOM = -4.8;
-export const BAR_HEIGHT = 9.6;
+export const BAR_HEIGHT = 10.4;
+export const BAR_MID = 0.4;
 export const SHELL_T = 0.08;
 export const STICK_HW = 0.95;
 export const STICK_END_R = 0.95;
 export const STICK_HT = 0.14;
-export const STICK_Y0 = -8.9;
-export const STICK_Y1 = -0.6;
+export const STICK_Y0 = -9.5;
+export const STICK_Y1 = 0.0;
 
 const fract = (x) => x - Math.floor(x);
 const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
@@ -96,13 +97,13 @@ export function sn3(x, y, z) {
 
 // Puffy egg-shaped paddle (superellipsoid / analytic gradient), mirrors common.glsl
 export function sdBar(x, y, z) {
-  const a = mix(2.98, 2.48, smoothstep(-3.2, 4.8, y));
-  const b = 4.8;
+  const a = mix(2.98, 2.58, smoothstep(-3.2, 5.6, y));
+  const b = 5.2;
   const c = 1.2;
-  const n = mix(2.95, 2.45, smoothstep(-4.8, 4.8, y));
+  const n = mix(3.2, 2.62, smoothstep(-4.8, 5.6, y));
   const m = 2.6;
   const sx = Math.max(Math.abs(x) / a, 1e-5);
-  const sy = Math.max(Math.abs(y) / b, 1e-5);
+  const sy = Math.max(Math.abs(y - BAR_MID) / b, 1e-5);
   const sz = Math.max(Math.abs(z) / c, 1e-5);
   const u = Math.pow(Math.pow(sx, n) + Math.pow(sy, n), 1 / n);
   const f = Math.pow(Math.pow(u, m) + Math.pow(sz, m), 1 / m);
@@ -115,11 +116,11 @@ export function sdBar(x, y, z) {
 }
 
 export function sdBlob(x, y, z) {
-  const cx = x / 2.45;
-  const cy = (y + 0.3) / 4.5;
+  const cx = x / 2.5;
+  const cy = (y - 0.1) / 4.9;
   const cz = z / 1.08;
   const k0 = Math.hypot(cx, cy, cz);
-  const k1 = Math.hypot(cx / 2.45, cy / 4.5, cz / 1.08);
+  const k1 = Math.hypot(cx / 2.5, cy / 4.9, cz / 1.08);
   return (k0 * (k0 - 1)) / Math.max(k1, 1e-4);
 }
 
@@ -164,7 +165,7 @@ export function bodyOuter(x, y, z, M) {
 export const STICK_WAIST_Y = -4.75;
 
 export function stickHalfWidth(y) {
-  return 0.62 + 0.33 * smoothstep(0.15, 3.25, Math.abs(y - STICK_WAIST_Y));
+  return 0.62 + 0.33 * smoothstep(0.15, 3.75, Math.abs(y - STICK_WAIST_Y));
 }
 
 // Waisted paddle stick, mirrors sdStickBase in scene.frag.glsl

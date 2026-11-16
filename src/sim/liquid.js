@@ -1,4 +1,4 @@
-import { BAR_BOTTOM, STICK_HT, STICK_Y0, bodyOuter, refToObj, smoothstep } from "./shape.js";
+import { BAR_BOTTOM, BAR_HEIGHT, STICK_HT, STICK_Y0, bodyOuter, refToObj, smoothstep } from "./shape.js";
 import { rand } from "./math.js";
 
 const GRAVITY = 980;
@@ -48,7 +48,7 @@ export class Liquid {
         kind: "face",
         mat: 0,
         x: rand(-1.4, 1.4),
-        y: 4.3,
+        y: 4.9,
         side: i % 2 === 0 ? 1 : -1,
         from: 0.36 + i * 0.08,
         feed: (M) => 0.5 + 0.8 * M.meltV,
@@ -130,7 +130,7 @@ export class Liquid {
 
       if (src.kind === "stick") {
         const z0 = src.side * 0.12;
-        const yb = this.bottomY(src.x * 1.2, z0, M, Math.min(BAR_BOTTOM + 3.5, BAR_BOTTOM + 9.6 / M.sag - 0.4));
+        const yb = this.bottomY(src.x * 1.2, z0, M, Math.min(BAR_BOTTOM + 3.5, BAR_BOTTOM + BAR_HEIGHT / M.sag - 0.4));
         if (yb === null) {
           st.alive = false;
         }

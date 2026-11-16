@@ -5,14 +5,15 @@
 // ---------------------------------------------------------------------------
 
 const float BAR_BOTTOM = -4.8;
-const float BAR_HEIGHT = 9.6;
+const float BAR_HEIGHT = 10.4;
+const float BAR_MID = 0.4;       // vertical centre of the bar
 const float SHELL_T = 0.08;      // chocolate shell thickness (0.8 mm)
 
 const float STICK_HW = 0.95;     // half width where it enters the bar
 const float STICK_END_R = 0.95;  // radius of the broad rounded end
 const float STICK_HT = 0.14;     // half thickness (a chunky 2.8 mm)
-const float STICK_Y0 = -8.9;     // bottom extreme
-const float STICK_Y1 = -0.6;     // top extreme (inside the bar): mirror of the bottom end
+const float STICK_Y0 = -9.5;     // bottom extreme
+const float STICK_Y1 = 0.0;      // top extreme (inside the bar): mirror of the bottom end
 const float STICK_WAIST_Y = -4.75; // narrowest point: right where it leaves the ice cream
 
 float hash12(vec2 p) {
@@ -110,12 +111,12 @@ float sdRoundCone(vec3 p, vec3 a, vec3 b, float r1, float r2) {
 // Distance = superellipsoid value / its analytic gradient.
 float sdBar(vec3 p) {
   // broad, flatter base by the stick; narrower, rounder top
-  float a = mix(2.98, 2.48, smoothstep(-3.2, 4.8, p.y));
-  const float b = 4.8;
+  float a = mix(2.98, 2.58, smoothstep(-3.2, 5.6, p.y));
+  const float b = 5.2;
   const float c = 1.2;
-  float n = mix(2.95, 2.45, smoothstep(-4.8, 4.8, p.y));
+  float n = mix(3.2, 2.62, smoothstep(-4.8, 5.6, p.y));
   const float m = 2.6;
-  vec3 s = max(vec3(abs(p.x) / a, abs(p.y) / b, abs(p.z) / c), vec3(1e-5));
+  vec3 s = max(vec3(abs(p.x) / a, abs(p.y - BAR_MID) / b, abs(p.z) / c), vec3(1e-5));
   float u = pow(pow(s.x, n) + pow(s.y, n), 1.0 / n);
   float f = pow(pow(u, m) + pow(s.z, m), 1.0 / m);
   float fm = pow(f, 1.0 - m);
@@ -126,8 +127,8 @@ float sdBar(vec3 p) {
 
 // The shape a melting bar slumps towards: a soft rounded lump.
 float sdBlob(vec3 p) {
-  vec3 c = p - vec3(0.0, -0.3, 0.0);
-  vec3 r = vec3(2.45, 4.5, 1.08);
+  vec3 c = p - vec3(0.0, 0.1, 0.0);
+  vec3 r = vec3(2.5, 4.9, 1.08);
   float k0 = length(c / r);
   float k1 = length(c / (r * r));
   return k0 * (k0 - 1.0) / max(k1, 1e-4);

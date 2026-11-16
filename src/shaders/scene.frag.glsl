@@ -45,7 +45,7 @@ uniform float uExposure;
 #include "common.glsl"
 
 const float TEXT_Y0 = -4.3;
-const float TEXT_Y1 = -0.72;
+const float TEXT_Y1 = -0.15;
 const int MAX_PRIMS = 64;
 const int MAX_IMPACTS = 16;
 const int MAX_CRUMBS = 24;
@@ -246,7 +246,7 @@ void bodyEval(vec3 p, inout Parts P) {
 // the ice cream (hidden until it melts) it widens again into a broad paddle.
 // The flare is mirrored exactly above and below the pinch.
 float stickHalfWidth(float y) {
-  return 0.62 + 0.33 * smoothstep(0.15, 3.25, abs(y - STICK_WAIST_Y));
+  return 0.62 + 0.33 * smoothstep(0.15, 3.75, abs(y - STICK_WAIST_Y));
 }
 
 float sdStickBase(vec3 p) {
@@ -325,8 +325,8 @@ float crumbs(vec3 p) {
 
 // --------------------------------------------------------------- scene ----
 
-const vec3 BODY_MIN = vec3(-3.5, -9.5, -1.75);
-const vec3 BODY_MAX = vec3(3.5, 5.2, 1.75);
+const vec3 BODY_MIN = vec3(-3.5, -10.1, -1.75);
+const vec3 BODY_MAX = vec3(3.5, 6.0, 1.75);
 
 float scene(vec3 p, bool full, out Parts P) {
   P.shell = 1e5; P.core = 1e5; P.body = 1e5; P.stick = 1e5;

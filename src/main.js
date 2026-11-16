@@ -16,7 +16,7 @@ const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").match
 
 const FOV = (24 * Math.PI) / 180;
 const TAN = Math.tan(FOV / 2);
-const OBJ_CENTER_Y = -2.25; // middle of bar + stick in object space
+const OBJ_CENTER_Y = -1.95; // middle of bar + stick in object space
 const REST_YAW = -0.4;
 
 let renderer;
@@ -58,7 +58,7 @@ function updateCamera() {
   const w = canvas.clientWidth || window.innerWidth;
   const h = canvas.clientHeight || window.innerHeight;
   const aspect = w / h;
-  const needH = 14.3 / 0.64;
+  const needH = 15.3 / 0.64;
   const needW = 7.2 / 0.78;
   const D = Math.max(needH / (2 * TAN), needW / (2 * TAN * aspect));
   cam.D = D;
@@ -285,7 +285,7 @@ resetBtn.addEventListener("click", () => {
 
 // ----------------------------------------------------------------- loop ----
 
-const BODY_BOX = { min: [-3.6, -9.45, -1.8], max: [3.6, 5.25, 1.8] };
+const BODY_BOX = { min: [-3.6, -10.05, -1.8], max: [3.6, 6.05, 1.8] };
 
 function sceneBounds() {
   const min = BODY_BOX.min.slice();
