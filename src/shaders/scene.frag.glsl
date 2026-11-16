@@ -168,9 +168,16 @@ void bodyEval(vec3 p, inout Parts P) {
   float tcE = SHELL_T * (1.0 - 0.6 * uMeltC);
   float dCore = dO + tcE;
   float dShell = dO;
-  if (uCracks > 0.5 && dO < 0.35 && dO > -0.6) {
+  // by the end the shell has melted away and the cracks fade out with it
+  float crackFade = 1.0 - smoothstep(0.72, 0.93, uMeltC);
+  if (uCracks > 0.5 && crackFade > 0.0 && dO < 0.35 && dO > -0.6) {
     float sink, fill, inHole, holeEdge, recess, gapAO, sinkCore;
     float vd = crackField(q, sink, fill, inHole, holeEdge, recess, gapAO, sinkCore);
+    sink *= crackFade;
+    sinkCore *= crackFade;
+    recess *= crackFade;
+    fill *= crackFade;
+    vd = mix(0.3, vd, crackFade);
     // the press pushes shell and ice cream in together
     dShell = max(dO + sink, -vd);
     dCore += sinkCore + recess;
