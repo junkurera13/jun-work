@@ -51,6 +51,9 @@ const weather = new WeatherPicker(weatherRoot, {
     state.weather = i;
     audio.tick(0.8 + i * 0.15);
   },
+  onSound: (on) => {
+    audio.muted = !on;
+  },
 });
 
 // --------------------------------------------------------------- camera ----
@@ -419,6 +422,8 @@ function frame(now) {
       weatherA: state.weatherW.slice(0, 4),
       weatherB: state.weatherW[4],
       lightTint: tint,
+      // keep the painting clear of the weather words (CSS px)
+      topInset: weatherRoot.getBoundingClientRect().bottom + 4,
     },
     scissorFor(b),
   );

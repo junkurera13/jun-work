@@ -75,55 +75,99 @@ body {
 }
 
 .weather {
+  position: fixed;
+  top: max(14px, env(safe-area-inset-top));
+  left: 0;
+  right: 0;
   display: flex;
-  gap: 4px;
-  padding: 4px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.72);
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 6px 18px rgba(0, 0, 0, 0.06);
+  justify-content: center;
+  gap: clamp(16px, 3.2vw, 34px);
+  padding: 4px 16px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  opacity: 0;
+  transition: opacity 900ms ease 400ms;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
-.weather-btn {
+.weather::-webkit-scrollbar {
+  display: none;
+}
+
+.is-ready .weather {
+  opacity: 1;
+}
+
+.weather-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex: none;
+}
+
+.weather-word {
   appearance: none;
   border: 0;
-  background: transparent;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  font-size: 19px;
-  line-height: 1;
+  background: none;
+  padding: 4px 0;
+  font: 400 17px/1.2 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  letter-spacing: 0.005em;
+  color: #c2bdb7;
   cursor: pointer;
-  opacity: 0.45;
-  filter: saturate(0.6);
-  transition: transform 260ms cubic-bezier(0.34, 1.56, 0.64, 1), opacity 200ms ease, filter 200ms ease,
-    background 200ms ease;
+  transition: color 240ms ease;
 }
 
-.weather-btn:hover {
-  opacity: 0.85;
-  filter: none;
-  transform: translateY(-2px);
+.weather-word:hover {
+  color: #8f8a84;
 }
 
-.weather-btn.is-on {
-  opacity: 1;
-  filter: none;
-  background: #fff;
-  transform: scale(1.14);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+.weather-word.is-on {
+  color: #5f5a55;
 }
 
-.weather-btn:active {
-  transform: scale(0.92);
-}
-
-.weather-btn:focus-visible {
+.weather-word:focus-visible,
+.weather-sound:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px #fff, 0 0 0 3.5px #9ec3e6;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.weather-sound {
+  appearance: none;
+  border: 0;
+  background: none;
+  padding: 2px;
+  width: 20px;
+  height: 20px;
+  color: #6f6a65;
+  cursor: pointer;
+  opacity: 0.85;
+}
+
+.weather-sound svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.weather-sound svg path:first-child {
+  fill: currentColor;
+  stroke: none;
+}
+
+@media (max-width: 520px) {
+  .weather {
+    justify-content: flex-start;
+  }
+  .weather-word {
+    font-size: 15px;
+  }
 }
 
 .reset {
