@@ -15,9 +15,9 @@ export class Liquid {
     this.reset();
   }
 
-  reset(faluda = false, coco = false) {
+  reset(faluda = false, mould = 0) {
     this.faluda = faluda;
-    this.coco = coco;
+    this.mould = mould;
     this.streams = new Map();
     this.falling = [];
     this.seed();
@@ -69,7 +69,9 @@ export class Liquid {
     }
     // passionfruit coconut: coconut milk (0) runs off the bottom and down the
     // stick; the passionfruit on top (1) runs from the upper faces
-    if (this.coco) for (const src of s) src.mat = src.kind === "face" && src.y > 1.6 ? 1 : 0;
+    if (this.mould === 1) for (const src of s) src.mat = src.kind === "face" && src.y > 1.6 ? 1 : 0;
+    // strawberry milk: it's all the one pink milk ice
+    if (this.mould === 2) for (const src of s) src.mat = 0;
     this.sources = s;
   }
 

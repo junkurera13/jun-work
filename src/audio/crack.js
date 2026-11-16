@@ -74,6 +74,48 @@ export class CrackAudio {
     return p;
   }
 
+  /**
+   * A finger pressing into frozen milk ice: no snap, just a soft, muffled
+   * squish. A slow-ish swell of low-passed noise (the surface giving way),
+   * a gentle low thud underneath, and a faint sticky release.
+   */
+  press(pan = 0) {
+    const ctx = this.ensure();
+    if (!ctx || this.muted) return;
+    const t = ctx.currentTime + 0.004;
+    const dest = this.out(pan);
+    // the give: muffled noise that swells in and sighs away
+    const src = ctx.createBufferSource();
+    src.buffer = this.noise;
+    src.playbackRate.value = rnd(0.55, 0.75);
+    const lp = ctx.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.frequency.setValueAtTime(rnd(1100, 1500), t);
+    lp.frequency.exponentialRampToValueAtTime(320, t + 0.16);
+    lp.Q.value = 0.7;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(rnd(0.16, 0.22), t + 0.025);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + rnd(0.15, 0.2));
+    src.connect(lp).connect(g).connect(dest);
+    src.start(t, rnd(0, 0.5));
+    src.stop(t + 0.25);
+    // a soft thud
+    const o = ctx.createOscillator();
+    o.type = "sine";
+    o.frequency.setValueAtTime(rnd(120, 150), t);
+    o.frequency.exponentialRampToValueAtTime(70, t + 0.1);
+    const og = ctx.createGain();
+    og.gain.setValueAtTime(0.0001, t);
+    og.gain.linearRampToValueAtTime(0.14, t + 0.012);
+    og.gain.exponentialRampToValueAtTime(0.0001, t + 0.13);
+    o.connect(og).connect(dest);
+    o.start(t);
+    o.stop(t + 0.15);
+    // the faint tacky release as the finger lifts off
+    this.grain(dest, t + rnd(0.09, 0.13), { dur: 0.03, freq: rnd(1800, 2400), q: 1.2, gain: 0.03, attack: 0.004 });
+  }
+
   /** a single filtered noise grain */
   grain(dest, t, { dur, freq, q, gain, type = "bandpass", attack = 0.0004 }) {
     const ctx = this.ctx;

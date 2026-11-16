@@ -9,7 +9,9 @@ export const MELT_SECONDS = 540;
  * Magic Choc: the vanilla inside starts going first; the chocolate shell follows
  * a little behind. Faluda: the rose ice runs first and the vanilla holds on.
  */
-export function meltParams(P, faluda = false, coco = false) {
+export function meltParams(P, faluda = false, mould = 0) {
+  // the coconut and strawberry milk lollies are one solid ice all the way through
+  const solid = mould > 0;
   const f = Math.pow(smoothstep(0.08, 1.0, P), 1.25);
   // the top slumps, but never squashes flat: the last of the ice cream stays
   // a rounded lump that shrinks onto the stick and melts away
@@ -19,7 +21,7 @@ export function meltParams(P, faluda = false, coco = false) {
   return {
     P,
     faluda,
-    coco,
+    mould,
     sag,
     erode,
     bulge,
@@ -30,11 +32,11 @@ export function meltParams(P, faluda = false, coco = false) {
     // Faluda: the other way round. The rose ice is outside, meets the warm
     // air first and turns straight into runny syrup; the vanilla inside is
     // insulated by it and its fat and air hold their shape for longer.
-    // Passionfruit coconut: solid ice all the way through, so inside and out go together.
-    meltV: coco ? smoothstep(0.0, 0.7, P) : faluda ? smoothstep(0.2, 0.95, P) : smoothstep(0.0, 0.8, P),
+    // Passionfruit coconut, strawberry milk: solid, so inside and out go together.
+    meltV: solid ? smoothstep(0.0, 0.7, P) : faluda ? smoothstep(0.2, 0.95, P) : smoothstep(0.0, 0.8, P),
     meltC: faluda ? smoothstep(0.0, 0.7, P) : smoothstep(0.12, 0.92, P),
     // (solid ice has no separate shell to melt off: it just erodes)
-    chocGone: coco ? 0 : faluda ? 1.1 * smoothstep(0.26, 0.86, P) : 1.1 * smoothstep(0.38, 1.0, P),
+    chocGone: solid ? 0 : faluda ? 1.1 * smoothstep(0.26, 0.86, P) : 1.1 * smoothstep(0.38, 1.0, P),
     stickK: 0.16 * smoothstep(0.3, 0.6, P) * (1 - smoothstep(0.96, 1.0, P)),
     wet: smoothstep(0.4, 0.75, P),
   };

@@ -77,7 +77,7 @@ export class Fracture {
     this.reset();
   }
 
-  reset(faluda = false, coco = false) {
+  reset(faluda = false, mould = 0, soft = false) {
     const g = this.g;
     g.globalCompositeOperation = "source-over";
     g.fillStyle = "#000";
@@ -95,12 +95,14 @@ export class Fracture {
     this.nextId = 1;
     this.off = 0;
     this.faluda = faluda;
-    this.coco = coco;
+    this.mould = mould;
+    // soft: a milk lolly that never cracks; a press just leaves a dent
+    this.soft = soft;
   }
 
   /** Distance once around the bar at height y (cm). */
   period(y) {
-    return 2 * Math.PI * crossSection(y, this.faluda, this.coco).R;
+    return 2 * Math.PI * crossSection(y, this.faluda, this.mould).R;
   }
 
   /**
@@ -144,9 +146,27 @@ export class Fracture {
   press(hit, now, M, world) {
     const q = deformRef(hit.x, hit.y, hit.z, M.sag, M.bulge, M.taper, M.shrink);
     const face = 0; // one chart all the way round
-    const ch = toChart(q.x, q.y, q.z, this.faluda, this.coco);
+    const ch = toChart(q.x, q.y, q.z, this.faluda, this.mould);
     q.x = ch.u;
     this.any = true;
+    if (this.soft) {
+      // frozen milk is firm but gives: the finger sinks in and leaves a soft,
+      // rounded dent (deeper with each press on the same spot). No cracks.
+      // a fingertip isn't a perfect circle: a main oval of random size, shape
+      // and angle, plus a couple of smaller lobes around it
+      const r = rand(0.75, 1.35);
+      const v = rand(60, 110);
+      const blobs = [{ dx: 0, dy: 0, r, aspect: rand(1.0, 1.5), rot: rand(0, Math.PI), v }];
+      const lobes = 1 + Math.floor(rand(0, 3));
+      for (let i = 0; i < lobes; i++) {
+        const a = rand(0, Math.PI * 2);
+        const d = rand(0.2, 0.5) * r;
+        blobs.push({ dx: Math.cos(a) * d, dy: Math.sin(a) * d, r: rand(0.35, 0.65) * r, aspect: rand(1.0, 1.6), rot: rand(0, Math.PI), v: v * rand(0.25, 0.55) });
+      }
+      this.draw({ kind: "dent", face, x: q.x, y: q.y, blobs });
+      this.texDirty = true;
+      return { type: "dent" };
+    }
     this.ooze = Math.max(this.ooze, 0.22); // a press squeezes a little vanilla up
     let type = "crack";
     // Is the spot under the finger a piece that's already broken free (fully
@@ -534,6 +554,31 @@ export class Fracture {
       g.fillStyle = `rgb(0,0,${op.v})`;
       this.path(op.face, op.poly);
       g.fill();
+    } else if (op.kind === "dent") {
+      // smooth oval dimples added into the push-in channel (B), stretched to
+      // match the chart's scale around the bar so they land true on the surface
+      const [cx, cy] = this.px(op.face, op.x, op.y);
+      const sx = CRACK_W / this.period(op.y) / PX;
+      for (const b of op.blobs) {
+        const ry = b.r * PX;
+        g.save();
+        g.translate(cx, cy);
+        g.scale(sx, 1);
+        g.translate(b.dx * PX, -b.dy * PX);
+        g.rotate(b.rot);
+        g.scale(b.aspect, 1);
+        const grad = g.createRadialGradient(0, 0, 0, 0, 0, ry);
+        for (let i = 0; i <= 10; i++) {
+          const t = i / 10;
+          const k = 0.5 + 0.5 * Math.cos(Math.PI * t); // soft cosine bowl
+          grad.addColorStop(t, `rgb(0,0,${Math.round(b.v * k)})`);
+        }
+        g.fillStyle = grad;
+        g.beginPath();
+        g.arc(0, 0, ry, 0, Math.PI * 2);
+        g.fill();
+        g.restore();
+      }
     } else if (op.kind === "hole") {
       g.fillStyle = "rgb(255,120,40)";
       this.path(op.face, op.poly);
@@ -623,7 +668,7 @@ export class Fracture {
       if (drew) this.texDirty = true;
     }
     // vanilla slowly wells up through the cracks as it softens
-    if (this.any && rate > 0) this.ooze = Math.min(1, this.ooze + dt * rate * (0.011 + 0.09 * M.meltV));
+    if (this.any && !this.soft && rate > 0) this.ooze = Math.min(1, this.ooze + dt * rate * (0.011 + 0.09 * M.meltV));
 
     for (const c of this.crumbs) {
       c.vel.y -= GRAVITY * dt;
@@ -640,7 +685,7 @@ export class Fracture {
     if (this.ooze < 0.5) return [];
     const out = this.impacts.map((imp) => {
       const y = imp.hole > 0.15 ? imp.y - imp.hole * 0.9 : Math.max(imp.low, imp.y - 1.0);
-      const r = fromChart(imp.x, y, this.faluda, this.coco);
+      const r = fromChart(imp.x, y, this.faluda, this.mould);
       return { id: `i${imp.id}`, x: r.x + Math.sin(imp.id * 7.3) * 0.12, y, side: r.side, hole: imp.hole > 0.15, fill: this.ooze };
     });
     out.sort((a, b) => a.y - b.y);

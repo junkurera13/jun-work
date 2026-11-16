@@ -123,8 +123,17 @@ export function sdBar(x, y, z) {
   return (f - 1) / Math.max(Math.hypot(gx, gy, gz), 1e-4);
 }
 
-function faludaCorner(y, coco) {
-  if (coco) return mix(0.38, 1.05, smoothstep(BAR_MID - 1, BAR_MID + 1, y));
+// Lolly moulds sharing the faluda's flat stick (mirror common.glsl)
+export const MOULD = { FALUDA: 0, COCO: 1, BERRY: 2 };
+const BERRY_W0 = 2.85; // wide at the stick end
+const BERRY_W1 = 1.32; // narrow at the tip
+const BERRY_RC = 0.5;
+const BERRY_T0 = 1.38;
+const BERRY_T1 = 0.92;
+
+function faludaCorner(y, mould) {
+  if (mould === MOULD.BERRY) return BERRY_RC;
+  if (mould === MOULD.COCO) return mix(0.38, 1.05, smoothstep(BAR_MID - 1, BAR_MID + 1, y));
   return mix(0.8, 2.05, smoothstep(BAR_MID - 1, BAR_MID + 1, y));
 }
 
@@ -150,11 +159,38 @@ function roundedExtrusion(profile, z, thickness, bevel) {
   return Math.hypot(Math.max(dx, 0), Math.max(dy, 0)) + Math.min(Math.max(dx, dy), 0) - bevel;
 }
 
-export function sdFaluda(x, y, z, coco = false) {
-  const o = roundedRect(x, y - BAR_MID, FALUDA_W, BAR_HEIGHT / 2, faludaCorner(y, coco));
+function trapezoid(px, py, r1, r2, he) {
+  const k1x = r2;
+  const k1y = he;
+  const k2x = r2 - r1;
+  const k2y = 2 * he;
+  px = Math.abs(px);
+  const cax = px - Math.min(px, py < 0 ? r1 : r2);
+  const cay = Math.abs(py) - he;
+  const t = clamp(((k1x - px) * k2x + (k1y - py) * k2y) / (k2x * k2x + k2y * k2y), 0, 1);
+  const cbx = px - k1x + k2x * t;
+  const cby = py - k1y + k2y * t;
+  const s = cbx < 0 && cay < 0 ? -1 : 1;
+  return s * Math.sqrt(Math.min(cax * cax + cay * cay, cbx * cbx + cby * cby));
+}
+
+function lollyHalfThick(y, mould) {
+  if (mould === MOULD.BERRY) return mix(BERRY_T0, BERRY_T1, clamp((y - BAR_BOTTOM) / BAR_HEIGHT, 0, 1));
+  return FALUDA_T;
+}
+
+export function sdFaluda(x, y, z, mould = MOULD.FALUDA) {
+  if (mould === MOULD.BERRY) {
+    const ob = trapezoid(x, y - BAR_MID, BERRY_W0 - BERRY_RC, BERRY_W1 - BERRY_RC, BAR_HEIGHT / 2 - BERRY_RC) - BERRY_RC;
+    const s = clamp((y - BAR_BOTTOM) / BAR_HEIGHT, 0, 1);
+    const xn = x / mix(BERRY_W0, BERRY_W1, s);
+    const tb = mix(BERRY_T0, BERRY_T1, s) * (1 - 0.15 * Math.sqrt(xn * xn + 0.03));
+    return roundedExtrusion(ob, z, tb, 0.5) * 0.88;
+  }
+  const o = roundedRect(x, y - BAR_MID, FALUDA_W, BAR_HEIGHT / 2, faludaCorner(y, mould));
   const ex = x / FALUDA_W;
   const ey = (y - BAR_MID) / (BAR_HEIGHT / 2);
-  if (coco) {
+  if (mould === MOULD.COCO) {
     const tc = FALUDA_T - 0.05 * ex * ex - 0.03 * ey * ey;
     return (roundedExtrusion(o, z, tc, 0.6) + cocoGrooves(x, y)) * 0.88;
   }
@@ -171,8 +207,8 @@ export function sdBlob(x, y, z) {
   return (k0 * (k0 - 1)) / Math.max(k1, 1e-4);
 }
 
-export function sdMelting(x, y, z, morph, faluda, coco = false) {
-  const a = faluda ? sdFaluda(x, y, z, coco) : sdBar(x, y, z);
+export function sdMelting(x, y, z, morph, faluda, mould = MOULD.FALUDA) {
+  const a = faluda ? sdFaluda(x, y, z, mould) : sdBar(x, y, z);
   if (!(morph > 0)) return a;
   return a + (sdBlob(x, y, z) - a) * morph;
 }
@@ -200,7 +236,7 @@ export function refToObj(qx, qy, qz, sag, bulge, taper = 0, shrink = 0) {
 
 export function bodyOuter(x, y, z, M) {
   const q = deformRef(x, y, z, M.sag, M.bulge, M.taper, M.shrink);
-  let d = sdMelting(q.x, q.y, q.z, M.morph, M.faluda, M.coco);
+  let d = sdMelting(q.x, q.y, q.z, M.morph, M.faluda, M.mould);
   if (M.erode > 0) {
     d += M.erode * (0.5 + 0.5 * q.hn);
     d += Math.min(M.erode, 1.2) * 0.5 * (sn3(x * 0.9 + 3.1, y * 0.9 + 7.7, z * 0.9 + 1.3) - 0.5);
@@ -240,12 +276,14 @@ export function sdStick(x, y, z, faluda) {
 // scene.frag.glsl.
 
 /** Cross-section of the undeformed bar at height y: half width W, half thickness T. */
-export function crossSection(y, faluda, coco = false) {
+export function crossSection(y, faluda, mould = MOULD.FALUDA) {
   if (faluda) {
-    const radius = faludaCorner(y, coco);
+    const radius = faludaCorner(y, mould);
     const dy = Math.max(0, Math.abs(y - BAR_MID) - BAR_HEIGHT / 2 + radius);
-    const W = FALUDA_W - radius + Math.sqrt(Math.max(0, radius * radius - dy * dy));
-    return { W, T: FALUDA_T, R: (2 * (W + FALUDA_T)) / Math.PI };
+    const w0 = mould === MOULD.BERRY ? mix(BERRY_W0, BERRY_W1, clamp((y - BAR_BOTTOM) / BAR_HEIGHT, 0, 1)) : FALUDA_W;
+    const W = w0 - radius + Math.sqrt(Math.max(0, radius * radius - dy * dy));
+    const T = lollyHalfThick(y, mould);
+    return { W, T, R: (2 * (W + T)) / Math.PI };
   }
   const a = mix(2.98, 2.58, smoothstep(-3.2, 5.6, y));
   const n = mix(3.2, 2.62, smoothstep(-4.8, 5.6, y));
@@ -256,8 +294,8 @@ export function crossSection(y, faluda, coco = false) {
 }
 
 /** Reference-space point -> chart (u, y). */
-export function toChart(x, y, z, faluda, coco = false) {
-  const c = crossSection(y, faluda, coco);
+export function toChart(x, y, z, faluda, mould = MOULD.FALUDA) {
+  const c = crossSection(y, faluda, mould);
   if (faluda) {
     // Project onto the box perimeter so fractures keep their proportions on the flat faces.
     const nx = Math.abs(x) / c.W;
@@ -271,8 +309,8 @@ export function toChart(x, y, z, faluda, coco = false) {
 }
 
 /** Chart (u, y) -> reference-space surface direction (x on the surface, side +1 front / -1 back). */
-export function fromChart(u, y, faluda, coco = false) {
-  const c = crossSection(y, faluda, coco);
+export function fromChart(u, y, faluda, mould = MOULD.FALUDA) {
+  const c = crossSection(y, faluda, mould);
   if (faluda) {
     const half = Math.PI * c.R;
     const wrapped = ((u + half) % (2 * half) + 2 * half) % (2 * half) - half;

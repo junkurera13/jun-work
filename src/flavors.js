@@ -32,9 +32,21 @@ export const FLAVORS = [
     // ice, topped with a layer of passionfruit pulp (seeds and all) that has
     // run down the faces before it froze
     faluda: true,
-    coco: true,
+    mould: 1,
     shell: "ice",
     swatch: { x: 0.2, y: 3.4, half: 1.5 },
     label: "A coconut ice lolly topped with passionfruit pulp and seeds. Tap to crack the ice.",
+  },
+  {
+    id: "strawberry-milk",
+    name: "strawberry milk",
+    // a tapered wedge mould: pink strawberry milk frozen soft, freckled with
+    // crushed strawberry. Nothing to crack: pressing it leaves a soft dent
+    faluda: true,
+    mould: 2,
+    soft: true,
+    shell: "soft",
+    swatch: { x: 0.1, y: -1.6, half: 1.5 },
+    label: "A strawberry milk ice pop, freckled with crushed strawberries. Press it to leave a soft dent.",
   },
 ];

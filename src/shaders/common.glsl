@@ -133,11 +133,26 @@ float sdBar(vec3 p) {
   return (f - 1.0) / max(length(g), 1e-4);
 }
 
+// The lolly moulds that share the faluda's flat stick and thick-ice cracking.
+const int MOULD_FALUDA = 0;  // soft pillow, almost-round top
+const int MOULD_COCO = 1;    // boxier, two grooves down each face
+const int MOULD_BERRY = 2;   // tapered wedge: wide at the stick, narrowing to the tip
+
+// Strawberry milk mould: a tapered wedge, wide and thick at the stick end,
+// narrowing to the tip, with a soft ridge down the middle of each face.
+// Half widths / half thicknesses at the bottom (stick end) and top.
+const float BERRY_W0 = 2.85;
+const float BERRY_W1 = 1.32;
+const float BERRY_RC = 0.5;   // corner rounding
+const float BERRY_T0 = 1.38;  // half thickness at the bottom...
+const float BERRY_T1 = 0.92;  // ...and at the top
+
 // Outline corner radius: a generous, almost-round top and small squared-off
 // shoulders at the bottom where it was poured into the mould.
-// coco: the passionfruit-coconut mould is boxier, with tighter corners.
-float faludaCorner(float y, bool coco) {
-  if (coco) return mix(0.38, 1.05, smoothstep(BAR_MID - 1.0, BAR_MID + 1.0, y));
+// The passionfruit-coconut mould is boxier, with tighter corners.
+float faludaCorner(float y, int mould) {
+  if (mould == MOULD_BERRY) return BERRY_RC;
+  if (mould == MOULD_COCO) return mix(0.38, 1.05, smoothstep(BAR_MID - 1.0, BAR_MID + 1.0, y));
   return mix(0.8, 2.05, smoothstep(BAR_MID - 1.0, BAR_MID + 1.0, y));
 }
 
@@ -151,8 +166,25 @@ float sdRoundedExtrusion(float profile, float z, float thickness, float bevel) {
   return length(max(d, 0.0)) + min(max(d.x, d.y), 0.0) - bevel;
 }
 
-float faludaOutline(vec2 p, bool coco) {
-  return sdRoundedRect(p - vec2(0.0, BAR_MID), vec2(FALUDA_W, BAR_HEIGHT * 0.5), faludaCorner(p.y, coco));
+float faludaOutline(vec2 p, int mould) {
+  if (mould == MOULD_BERRY) {
+    return sdTrapezoid(p - vec2(0.0, BAR_MID), BERRY_W0 - BERRY_RC, BERRY_W1 - BERRY_RC, BAR_HEIGHT * 0.5 - BERRY_RC) - BERRY_RC;
+  }
+  return sdRoundedRect(p - vec2(0.0, BAR_MID), vec2(FALUDA_W, BAR_HEIGHT * 0.5), faludaCorner(p.y, mould));
+}
+
+// Half width of the outline at height y (the crack chart needs it).
+float lollyHalfWidth(float y, int mould) {
+  float radius = faludaCorner(y, mould);
+  float dy = max(0.0, abs(y - BAR_MID) - BAR_HEIGHT * 0.5 + radius);
+  float w = FALUDA_W;
+  if (mould == MOULD_BERRY) w = mix(BERRY_W0, BERRY_W1, clamp((y - BAR_BOTTOM) / BAR_HEIGHT, 0.0, 1.0));
+  return w - radius + sqrt(max(0.0, radius * radius - dy * dy));
+}
+
+float lollyHalfThick(float y, int mould) {
+  if (mould == MOULD_BERRY) return mix(BERRY_T0, BERRY_T1, clamp((y - BAR_BOTTOM) / BAR_HEIGHT, 0.0, 1.0));
+  return FALUDA_T;
 }
 
 // The coconut mould's two grooves down each face, splitting it into three
@@ -168,11 +200,19 @@ float cocoGrooves(vec2 p) {
 
 // A pillow, not a box: faces very slightly domed towards the middle, rolling
 // over into the sides with a big soft radius (no flat bevel ledge).
-float sdFaluda(vec3 p, bool coco) {
-  float o = faludaOutline(p.xy, coco);
+float sdFaluda(vec3 p, int mould) {
+  float o = faludaOutline(p.xy, mould);
+  if (mould == MOULD_BERRY) {
+    // each face rises gently to a soft ridge down the middle
+    float s = clamp((p.y - BAR_BOTTOM) / BAR_HEIGHT, 0.0, 1.0);
+    float w = mix(BERRY_W0, BERRY_W1, s);
+    float xn = p.x / w;
+    float t = mix(BERRY_T0, BERRY_T1, s) * (1.0 - 0.15 * sqrt(xn * xn + 0.03));
+    return sdRoundedExtrusion(o, p.z, t, 0.5) * 0.88;
+  }
   // smooth in x and y (a dome built from the outline distance would crease)
   vec2 e = vec2(p.x / FALUDA_W, (p.y - BAR_MID) / (BAR_HEIGHT * 0.5));
-  if (coco) {
+  if (mould == MOULD_COCO) {
     // flatter faces, a tighter roll into the sides, and the two grooves
     float t = FALUDA_T - 0.05 * e.x * e.x - 0.03 * e.y * e.y;
     return (sdRoundedExtrusion(o, p.z, t, 0.6) + cocoGrooves(p.xy)) * 0.88;
@@ -190,8 +230,8 @@ float sdBlob(vec3 p) {
   return k0 * (k0 - 1.0) / max(k1, 1e-4);
 }
 
-float sdMelting(vec3 q, float morph, bool faluda, bool coco) {
-  float a = faluda ? sdFaluda(q, coco) : sdBar(q);
+float sdMelting(vec3 q, float morph, bool faluda, int mould) {
+  float a = faluda ? sdFaluda(q, mould) : sdBar(q);
   if (morph <= 0.0) return a;
   return mix(a, sdBlob(q), morph);
 }

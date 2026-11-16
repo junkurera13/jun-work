@@ -3,6 +3,8 @@
 A blank white page with a Magic Choc vanilla ice cream and a Faluda popsicle: a thick wall of frosty rose ice around a vanilla ice cream centre.
 There's also a passionfruit coconut ice lolly: creamy coconut ice from a grooved mould, topped with a layer of
 passionfruit pulp (seeds in their gel and all) that ran down the faces in drips before it froze.
+And a strawberry milk ice pop: a tapered wedge of soft pink milk ice freckled with crushed strawberry. It
+doesn't crack; pressing it leaves soft dents, like firm frozen ice cream.
 Use the flavor buttons below the scene to switch between them.
 
 - **Tap / click** the shell to break it: a patch around your finger snaps into
