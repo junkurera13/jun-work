@@ -45,7 +45,7 @@ npm run build
 | `src/sim/liquid.js` | Rivulets, hanging drops, pinch-off and falling drops |
 | `src/audio/crack.js` | Procedural chocolate-snap sounds |
 | `src/shaders/background.glsl` | The painted weather backdrop that fades into the white page |
-| `src/ui/weather.js` | The line of weather words (and the sound toggle) |
+| `src/ui/weather.js` | The line of weather words |
 | `archive/` | The old portfolio |
 
 Run `__ice.setMelt(0.6)` or `__ice.setWeather(4)` in the console to jump around the melt.

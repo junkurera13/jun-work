@@ -1,6 +1,6 @@
 import { smoothstep } from "./shape.js";
 
-// Seconds for a complete melt at 1x (the default temperature).
+// Seconds for a complete melt at 1x (Breeze).
 export const MELT_SECONDS = 540;
 
 /**
@@ -32,7 +32,7 @@ export function meltParams(P) {
   };
 }
 
-// The weather sets the melt speed (x the default pace) and tints the light
+// The weather sets the melt speed (relative to Breeze) and tints the light
 // on the ice cream. Order matches the painted backdrops in background.glsl.
 export const WEATHERS = [
   { id: "snow", icon: "\u2744\ufe0f", word: "snow", label: "Snow", rate: 0, tint: [0.92, 0.96, 1.06] },
@@ -41,4 +41,4 @@ export const WEATHERS = [
   { id: "summer", icon: "\u2600\ufe0f", word: "sunshine", label: "Sunshine", rate: 3, tint: [1.07, 1.01, 0.92] },
   { id: "brutal", icon: "\ud83d\udd25", word: "heatwave", label: "Heatwave", rate: 7, tint: [1.14, 0.99, 0.84] },
 ];
-export const WEATHER_DEFAULT = 2;
+export const WEATHER_DEFAULT = WEATHERS.findIndex((weather) => weather.id === "summer");

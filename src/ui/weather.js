@@ -1,17 +1,13 @@
 import { WEATHERS } from "../sim/melt.js";
 
 /**
- * A quiet line of words across the top: the weather. The current one is a
- * little darker. Picking a word changes the painted sky and how fast the ice
- * cream melts.
+ * Picking a word changes the painted sky and how fast the ice cream melts.
+ * Arrow keys move between the weather buttons.
  */
 export class WeatherPicker {
   constructor(root, { value, onChange }) {
-    this.root = root;
     this.onChange = onChange;
-    this.items = WEATHERS.map((w, i) => {
-      const item = document.createElement("span");
-      item.className = "weather-item";
+    this.buttons = WEATHERS.map((w, i) => {
       const b = document.createElement("button");
       b.type = "button";
       b.className = "weather-word";
@@ -24,11 +20,10 @@ export class WeatherPicker {
         e.preventDefault();
         const n = (this.value + step + WEATHERS.length) % WEATHERS.length;
         this.set(n);
-        this.items[n].b.focus();
+        this.buttons[n].focus();
       });
-      item.appendChild(b);
-      root.appendChild(item);
-      return { item, b };
+      root.appendChild(b);
+      return b;
     });
     this.set(value, false);
   }
@@ -36,7 +31,7 @@ export class WeatherPicker {
   set(i, notify = true) {
     const changed = i !== this.value;
     this.value = i;
-    this.items.forEach(({ item, b }, j) => {
+    this.buttons.forEach((b, j) => {
       const on = j === i;
       b.classList.toggle("is-on", on);
       b.setAttribute("aria-checked", on ? "true" : "false");

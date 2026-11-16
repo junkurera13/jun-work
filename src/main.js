@@ -10,6 +10,7 @@ import { bodyOuter, sdStick, STICK_Y0 } from "./sim/shape.js";
 import { mat3FromQuat, mulMat3, mulMat3T, quatFromAxisAngle, quatMul } from "./sim/math.js";
 
 const canvas = document.querySelector("#scene");
+const controls = document.querySelector(".controls");
 const weatherRoot = document.querySelector(".weather");
 const resetBtn = document.querySelector(".reset");
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -17,6 +18,7 @@ const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").match
 const FOV = (24 * Math.PI) / 180;
 const TAN = Math.tan(FOV / 2);
 const OBJ_CENTER_Y = -1.95; // middle of bar + stick in object space
+const OBJ_Y_OFFSET = -0.35;
 const REST_YAW = -0.4;
 
 let renderer;
@@ -127,7 +129,7 @@ function updateWorld() {
   const drop = (1 - a) * 26;
   world.pos = {
     x: state.shake * 0.03 * Math.sin(t * 77),
-    y: -OBJ_CENTER_Y + bob + drop,
+    y: -OBJ_CENTER_Y + OBJ_Y_OFFSET + bob + drop,
     z: 0,
   };
 }
@@ -254,7 +256,7 @@ window.addEventListener("pointercancel", onUp);
 canvas.addEventListener("contextmenu", (e) => e.preventDefault());
 
 window.addEventListener("keydown", (e) => {
-  if (e.target.closest?.(".controls")) return;
+  if (e.target === resetBtn || e.target.closest?.(".controls")) return;
   if (e.key === "ArrowLeft") state.yawVel -= 2;
   if (e.key === "ArrowRight") state.yawVel += 2;
 });
@@ -332,6 +334,8 @@ function scissorFor(b) {
 
 let last = performance.now();
 let lastFrameStart = last;
+let backdropInsetTop = 0;
+let backdropInsetBottom = 0;
 
 function frame(now) {
   requestAnimationFrame(frame);
@@ -419,8 +423,8 @@ function frame(now) {
       weatherA: state.weatherW.slice(0, 4),
       weatherB: state.weatherW[4],
       lightTint: tint,
-      // keep the painting clear of the weather words (CSS px)
-      topInset: weatherRoot.getBoundingClientRect().bottom + 4,
+      backdropInsetTop,
+      backdropInsetBottom,
     },
     scissorFor(b),
   );
@@ -432,9 +436,22 @@ function frame(now) {
 
 // ----------------------------------------------------------------- boot ----
 
-updateCamera();
-window.addEventListener("resize", () => {
+function updateLayout() {
   updateCamera();
+  const shortSide = Math.min(canvas.clientWidth, canvas.clientHeight);
+  const headerBottom = controls.getBoundingClientRect().bottom;
+  backdropInsetTop = Math.min(
+    Math.max(0.055 * shortSide, headerBottom + 0.024 * shortSide + 5),
+    0.24 * canvas.clientHeight,
+  );
+  backdropInsetBottom = Math.max(0, backdropInsetTop - 16);
+  const viewportInsetBottom = backdropInsetBottom - canvas.getBoundingClientRect().top;
+  resetBtn.style.setProperty("--backdrop-inset-bottom", `${viewportInsetBottom}px`);
+}
+
+updateLayout();
+window.addEventListener("resize", () => {
+  updateLayout();
   renderer?.resize();
 });
 
