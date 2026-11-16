@@ -32,28 +32,13 @@ export function meltParams(P) {
   };
 }
 
-// Temperature dial -> melt speed multiplier.
-export const TEMP_MIN = -18;
-export const TEMP_MAX = 45;
-export const TEMP_DEFAULT = 29;
-
-// Evenly spread: each degree above the default adds the same amount of speed
-// (1x at 29 deg up to 8x at 45 deg, so 38 -> 45 is a step, not a cliff);
-// below the default it eases down to a standstill at freezing.
-export const RATE_MAX = 8;
-
-export function rateForTemp(t) {
-  if (t <= -4) return 0;
-  if (t >= TEMP_DEFAULT) return 1 + ((RATE_MAX - 1) * (t - TEMP_DEFAULT)) / (TEMP_MAX - TEMP_DEFAULT);
-  const k = (t + 4) / (TEMP_DEFAULT + 4);
-  return k * k;
-}
-
-export function describeTemp(t) {
-  if (t <= -4) return "frozen";
-  if (t < 12) return "barely";
-  if (t < 24) return "slow";
-  if (t < 33) return "Sunday";
-  if (t < 39) return "fast";
-  return "very fast";
-}
+// The weather sets the melt speed (x the default pace) and tints the light
+// on the ice cream. Order matches the painted backdrops in background.glsl.
+export const WEATHERS = [
+  { id: "snow", icon: "\u2744\ufe0f", label: "Snowy", rate: 0, tint: [0.92, 0.96, 1.06] },
+  { id: "rain", icon: "\ud83c\udf27\ufe0f", label: "Rainy", rate: 0.4, tint: [0.88, 0.92, 0.98] },
+  { id: "normal", icon: "\u26c5", label: "Normal", rate: 1, tint: [1, 1, 1] },
+  { id: "summer", icon: "\u2600\ufe0f", label: "Summer", rate: 3, tint: [1.07, 1.01, 0.92] },
+  { id: "brutal", icon: "\ud83d\udd25", label: "Brutal summer", rate: 7, tint: [1.14, 0.99, 0.84] },
+];
+export const WEATHER_DEFAULT = 2;

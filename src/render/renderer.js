@@ -1,5 +1,10 @@
 import fragSrc from "../shaders/scene.frag.glsl?raw";
 import commonSrc from "../shaders/common.glsl?raw";
+import bgFragSrc from "../shaders/bg.frag.glsl?raw";
+import backgroundSrc from "../shaders/background.glsl?raw";
+
+const withIncludes = (s) =>
+  s.replace('#include "common.glsl"', commonSrc).replace('#include "background.glsl"', backgroundSrc);
 
 const VERT = `#version 300 es
 layout(location = 0) in vec2 aPos;
@@ -30,9 +35,8 @@ export class Renderer {
     this.gl = gl;
     this.parallel = gl.getExtension("KHR_parallel_shader_compile");
 
-    const src = fragSrc.replace('#include "common.glsl"', commonSrc);
     const vs = compile(gl, gl.VERTEX_SHADER, VERT);
-    const fs = compile(gl, gl.FRAGMENT_SHADER, src);
+    const fs = compile(gl, gl.FRAGMENT_SHADER, withIncludes(fragSrc));
     const prog = gl.createProgram();
     gl.attachShader(prog, vs);
     gl.attachShader(prog, fs);
@@ -40,6 +44,14 @@ export class Renderer {
     this.prog = prog;
     this.vs = vs;
     this.fs = fs;
+    // the painted weather backdrop, drawn full screen behind the ice cream
+    const bfs = compile(gl, gl.FRAGMENT_SHADER, withIncludes(bgFragSrc));
+    const bprog = gl.createProgram();
+    gl.attachShader(bprog, vs);
+    gl.attachShader(bprog, bfs);
+    gl.linkProgram(bprog);
+    this.bgProg = bprog;
+    this.bgFs = bfs;
 
     const buf = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, buf);
@@ -72,6 +84,10 @@ export class Renderer {
           reject(new Error(log));
           return;
         }
+        if (!gl.getProgramParameter(this.bgProg, gl.LINK_STATUS)) {
+          reject(new Error(gl.getShaderInfoLog(this.bgFs) || gl.getProgramInfoLog(this.bgProg)));
+          return;
+        }
         this.setup();
         resolve();
       };
@@ -92,6 +108,8 @@ export class Renderer {
     gl.uniform1i(this.u.uCrackTex, 0);
     gl.uniform1i(this.u.uDyn, 1);
     gl.uniform1i(this.u.uTextTex, 2);
+    this.bu = {};
+    for (const name of ["uRes", "uTime", "uWeatherA", "uWeatherB"]) this.bu[name] = gl.getUniformLocation(this.bgProg, name);
   }
 
   floatTex(w, h) {
@@ -170,10 +188,22 @@ export class Renderer {
     const sorted = [...this.frameTimes].sort((a, b) => a - b);
     const med = sorted[sorted.length >> 1];
     this.frameTimes.length = 0;
-    const before = this.scale;
-    if (med > 24) this.scale = Math.max(0.45, this.scale * 0.85);
-    else if (med < 14.5 && this.scale < 1) this.scale = Math.min(1, this.scale * 1.08);
-    if (Math.abs(before - this.scale) > 1e-3) this.resize(true);
+    // Only change the scale here. Resizing the canvas wipes it, so the new
+    // size is applied by resize() at the start of the next frame, right
+    // before drawing (doing it after a draw flashed a blank frame).
+    // Going up needs a long run of fast frames, so it doesn't flip-flop.
+    if (med > 24) {
+      this.scale = Math.max(0.45, this.scale * 0.85);
+      this.fastRuns = 0;
+    } else if (med < 13 && this.scale < 1) {
+      this.fastRuns = (this.fastRuns || 0) + 1;
+      if (this.fastRuns >= 3) {
+        this.scale = Math.min(1, this.scale * 1.08);
+        this.fastRuns = 0;
+      }
+    } else {
+      this.fastRuns = 0;
+    }
   }
 
   draw(U, scissor) {
@@ -182,8 +212,15 @@ export class Renderer {
     const H = this.canvas.height;
     gl.viewport(0, 0, W, H);
     gl.disable(gl.SCISSOR_TEST);
-    gl.clearColor(1, 1, 1, 1);
-    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.bindVertexArray(this.vao);
+    // 1. the painted weather backdrop, full screen
+    gl.useProgram(this.bgProg);
+    gl.uniform2f(this.bu.uRes, W, H);
+    gl.uniform1f(this.bu.uTime, U.time);
+    gl.uniform4fv(this.bu.uWeatherA, U.weatherA);
+    gl.uniform1f(this.bu.uWeatherB, U.weatherB);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    // 2. the ice cream, only where it can be
     if (scissor) {
       const x0 = Math.max(0, Math.floor(scissor[0] * W));
       const y0 = Math.max(0, Math.floor(scissor[1] * H));
@@ -196,6 +233,9 @@ export class Renderer {
     gl.useProgram(this.prog);
     const u = this.u;
     gl.uniform2f(u.uRes, W, H);
+    gl.uniform4fv(u.uWeatherA, U.weatherA);
+    gl.uniform1f(u.uWeatherB, U.weatherB);
+    gl.uniform3fv(u.uLightTint, U.lightTint);
     gl.uniform3f(u.uCamPos, U.camPos.x, U.camPos.y, U.camPos.z);
     gl.uniformMatrix3fv(u.uCamBasis, false, U.camBasis);
     gl.uniform1f(u.uTanHalfFov, U.tanHalfFov);

@@ -2,15 +2,15 @@ import "./styles.css";
 import { Renderer } from "./render/renderer.js";
 import { engravingCanvas } from "./render/engraving.js";
 import { CrackAudio } from "./audio/crack.js";
-import { Dial } from "./ui/dial.js";
+import { WeatherPicker } from "./ui/weather.js";
 import { Fracture } from "./sim/fracture.js";
 import { Liquid } from "./sim/liquid.js";
-import { MELT_SECONDS, TEMP_DEFAULT, meltParams, rateForTemp } from "./sim/melt.js";
+import { MELT_SECONDS, WEATHERS, WEATHER_DEFAULT, meltParams } from "./sim/melt.js";
 import { bodyOuter, sdStick, STICK_Y0 } from "./sim/shape.js";
 import { mat3FromQuat, mulMat3, mulMat3T, quatFromAxisAngle, quatMul } from "./sim/math.js";
 
 const canvas = document.querySelector("#scene");
-const controls = document.querySelector(".controls");
+const weatherRoot = document.querySelector(".weather");
 const resetBtn = document.querySelector(".reset");
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -32,7 +32,9 @@ const liquid = new Liquid();
 
 const state = {
   P: 0,
-  temp: TEMP_DEFAULT,
+  weather: WEATHER_DEFAULT,
+  // eased blend of the weathers (for the painted sky, light and melt speed)
+  weatherW: WEATHERS.map((_, i) => (i === WEATHER_DEFAULT ? 1 : 0)),
   yaw: REST_YAW,
   pitch: 0,
   yawVel: 0,
@@ -43,11 +45,12 @@ const state = {
   shake: 0,
 };
 
-const dial = new Dial(controls, {
-  onChange: (t) => {
-    state.temp = t;
+const weather = new WeatherPicker(weatherRoot, {
+  value: WEATHER_DEFAULT,
+  onChange: (i) => {
+    state.weather = i;
+    audio.tick(0.8 + i * 0.15);
   },
-  onTick: (t) => audio.tick(0.8 + t * 0.6),
 });
 
 // --------------------------------------------------------------- camera ----
@@ -336,8 +339,13 @@ function frame(now) {
   last = now;
   state.time += dt;
 
+  // the weather washes in over ~1.5 s; speed, sky and light all follow it
+  const ease = 1 - Math.exp(-dt * 2.2);
+  state.weatherW = state.weatherW.map((w, i) => w + ((i === state.weather ? 1 : 0) - w) * ease);
+  const rate = WEATHERS.reduce((a, w, i) => a + w.rate * state.weatherW[i], 0);
+  const tint = [0, 1, 2].map((k) => WEATHERS.reduce((a, w, i) => a + w.tint[k] * state.weatherW[i], 0));
+
   // melting
-  const rate = rateForTemp(state.temp);
   if (state.appear >= 1) state.P = Math.min(1, state.P + (dt * rate) / MELT_SECONDS);
   if (state.P > 0.04) revealReset();
   const M = meltParams(state.P);
@@ -408,6 +416,9 @@ function frame(now) {
       liqMin: liq.count ? liq.min : [0, 0, 0],
       liqMax: liq.count ? liq.max : [0, 0, 0],
       exposure: 1.0,
+      weatherA: state.weatherW.slice(0, 4),
+      weatherB: state.weatherW[4],
+      lightTint: tint,
     },
     scissorFor(b),
   );
@@ -449,7 +460,9 @@ window.__ice = {
   setMelt: (p) => {
     state.P = Math.max(0, Math.min(1, p));
   },
-  setTemp: (t) => dial.set(t),
+  setWeather: (i) => weather.set(i),
+  // older test hook: map a temperature onto the nearest weather
+  setTemp: (t) => weather.set(t <= -4 ? 0 : t < 20 ? 1 : t < 33 ? 2 : t < 40 ? 3 : 4),
   tap: (x, y) => onDown({ clientX: x, clientY: y, pointerId: 1, button: 0 }) || onUp({ pointerId: 1 }),
   renew: newIceCream,
   fracture,
