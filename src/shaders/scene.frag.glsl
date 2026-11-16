@@ -241,10 +241,26 @@ void bodyEval(vec3 p, inout Parts P) {
 
 // --------------------------------------------------------------- stick ----
 
+// Half width along the stick: a waisted paddle. Wide at the rounded end,
+// pinched in through the middle of the handle, wide again where it enters
+// the ice cream (and straight from there up, under the engraving).
+float stickHalfWidth(float y) {
+  float t = (y - STICK_WAIST_Y) / 1.05;
+  return STICK_HW + 0.12 * smoothstep(-7.2, -8.9, y) - 0.18 * exp(-t * t);
+}
+
 float sdStickBase(vec3 p) {
-  vec2 q = p.xy;
-  q.y -= clamp(q.y, STICK_Y0 + STICK_HW, STICK_Y1 - STICK_HW);
-  float d2 = length(q) - STICK_HW;
+  float yc0 = STICK_Y0 + STICK_END_R;
+  float yc1 = STICK_Y1 - STICK_HW;
+  float d2;
+  if (p.y < yc0) {
+    float rb = stickHalfWidth(yc0);
+    d2 = length(vec2(p.x, p.y - yc0)) - rb;
+  } else if (p.y > yc1) {
+    d2 = length(vec2(p.x, p.y - yc1)) - STICK_HW;
+  } else {
+    d2 = (abs(p.x) - stickHalfWidth(p.y)) * 0.95;
+  }
   float re = 0.06;
   vec2 w = vec2(d2 + re, abs(p.z) - STICK_HT + re);
   return min(max(w.x, w.y), 0.0) + length(max(w, 0.0)) - re;

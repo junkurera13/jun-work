@@ -8,10 +8,12 @@ const float BAR_BOTTOM = -4.8;
 const float BAR_HEIGHT = 9.6;
 const float SHELL_T = 0.08;      // chocolate shell thickness (0.8 mm)
 
-const float STICK_HW = 0.6;      // half width (a broad 1.2 cm stick)
+const float STICK_HW = 0.72;     // half width where it enters the bar
+const float STICK_END_R = 0.84;  // radius of the broad rounded end
 const float STICK_HT = 0.14;     // half thickness (a chunky 2.8 mm)
 const float STICK_Y0 = -9.3;     // bottom extreme
 const float STICK_Y1 = 2.1;      // top extreme (inside the bar)
+const float STICK_WAIST_Y = -6.8; // narrowest point of the handle
 
 float hash12(vec2 p) {
   vec3 p3 = fract(vec3(p.xyx) * 0.1031);
