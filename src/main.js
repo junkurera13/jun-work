@@ -322,36 +322,25 @@ const dock = new Dock(dockRoot, {
   },
 });
 
-// Each dock icon is the real ice cream, rendered once by the same shader:
-// straight on, through a very long lens (almost flat, like a product shot),
-// framing just the bar. The dock lets only the top peek up from the bottom.
-function renderDockIcons() {
-  const w = 120;
-  const h = 200;
+// Each picker orb is a ball of that ice cream's own shell (glossy
+// chocolate, frosty rose ice...), rendered once by the same shader, straight
+// on through a very long lens.
+function renderOrbs() {
+  const px = 96;
   const ss = 2; // supersampled, then scaled down for smooth edges
   const tan = 0.05;
-  const half = 5.45; // half the framed height (cm)
-  const D = half / tan;
-  const centre = 0.55;
-  const eye = { x: 0, y: centre, z: D };
-  const f = { x: 0, y: 0, z: -1 };
-  const r = { x: 1, y: 0, z: 0 };
-  const u = { x: 0, y: 1, z: 0 };
-  const rot = mat3FromQuat(quatFromAxisAngle(0, 1, 0, -0.14)); // a hair of turn, for depth
-  const camObj = mulMat3T(rot, eye.x, eye.y, eye.z);
-  const ro = mulMat3T(rot, r.x, r.y, r.z);
-  const uo = mulMat3T(rot, u.x, u.y, u.z);
-  const fo = mulMat3T(rot, f.x, f.y, f.z);
+  const D = 2.12 / tan;
   FLAVORS.forEach((flavor, i) => {
     const img = renderer.thumbnail(
       {
-        camPos: camObj,
-        camBasis: [ro.x, ro.y, ro.z, uo.x, uo.y, uo.z, fo.x, fo.y, fo.z],
+        orb: true,
+        camPos: { x: 0, y: 0, z: D },
+        camBasis: [1, 0, 0, 0, 1, 0, 0, 0, -1],
         tanHalfFov: tan,
-        objRot: rot,
+        objRot: [1, 0, 0, 0, 1, 0, 0, 0, 1],
         time: 0,
-        boundMin: [BODY_BOX.min[0], STICK_Y0 - 0.2, BODY_BOX.min[2]],
-        boundMax: BODY_BOX.max,
+        boundMin: [-2.3, -2.3, -2.3],
+        boundMax: [2.3, 2.3, 2.3],
         melt: meltParams(0, flavor.faluda),
         cracks: false,
         ooze: 0,
@@ -364,15 +353,15 @@ function renderDockIcons() {
         weatherB: 0,
         lightTint: [1, 1, 1],
       },
-      w * ss,
-      h * ss,
+      px * ss,
+      px * ss,
     );
     const out = document.createElement("canvas");
-    out.width = w;
-    out.height = h;
+    out.width = px;
+    out.height = px;
     const g = out.getContext("2d");
     g.imageSmoothingQuality = "high";
-    g.drawImage(img, 0, 0, w, h);
+    g.drawImage(img, 0, 0, px, px);
     dock.setIcon(i, out.toDataURL("image/png"));
   });
 }
@@ -538,7 +527,7 @@ function updateLayout() {
   );
   backdropInsetBottom = Math.max(0, backdropInsetTop - 16);
   const viewportInsetBottom = backdropInsetBottom - canvas.getBoundingClientRect().top;
-  resetBtn.style.setProperty("--backdrop-inset-bottom", `${viewportInsetBottom}px`);
+  document.documentElement.style.setProperty("--backdrop-inset-bottom", `${viewportInsetBottom}px`);
 }
 
 updateLayout();
@@ -554,7 +543,7 @@ if (renderer) {
     .ready()
     .then(() => {
       renderer.uploadCracks(fracture.canvas);
-      renderDockIcons();
+      renderOrbs();
       document.body.classList.add("is-ready");
       state.appear = 0;
       last = performance.now();

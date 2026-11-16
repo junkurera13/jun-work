@@ -1,8 +1,8 @@
 /**
- * The ice creams, lined up along the bottom edge like brushes in an art
- * tool's tray: only their tops peek up from below the screen. Hovering one
- * lifts it out a little, the one you're holding stays raised, and the name
- * floats above it. Arrow keys move between them.
+ * The flavor picker: a row of little orbs in the bottom-left corner of the
+ * painting, each a ball of that ice cream's own shell. Hovering one swells it
+ * and shows its name; a fine ring marks the one on screen. Arrow keys move
+ * between them.
  */
 export class Dock {
   constructor(root, { items, value = 0, onChange }) {
