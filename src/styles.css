@@ -1,9 +1,16 @@
 :root {
+  --backdrop-inset: 5.5vmin;
   --ink: #1a1a1a;
   --muted: #a3a3a3;
   --line: #e4e4e4;
   --heat: 0.75;
   color-scheme: light;
+}
+
+@supports (width: 1dvmin) {
+  :root {
+    --backdrop-inset: 5.5dvmin;
+  }
 }
 
 * {
@@ -29,6 +36,7 @@ body {
 #scene {
   position: fixed;
   inset: 0;
+  top: 4px;
   width: 100vw;
   height: 100vh;
   height: 100dvh;
@@ -57,32 +65,12 @@ body {
 
 .controls {
   position: fixed;
-  left: 50%;
-  bottom: max(18px, env(safe-area-inset-bottom));
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 8px;
-  opacity: 0;
-  transition: opacity 900ms ease 400ms;
-  user-select: none;
-  -webkit-user-select: none;
-}
-
-.is-ready .controls {
-  opacity: 1;
-}
-
-.weather {
-  position: fixed;
   top: max(14px, env(safe-area-inset-top));
   left: 0;
   right: 0;
   display: flex;
-  justify-content: center;
-  gap: clamp(16px, 3.2vw, 34px);
-  padding: 4px 16px;
+  justify-content: safe center;
+  padding: 4px;
   overflow-x: auto;
   scrollbar-width: none;
   opacity: 0;
@@ -91,27 +79,27 @@ body {
   -webkit-user-select: none;
 }
 
-.weather::-webkit-scrollbar {
+.controls::-webkit-scrollbar {
   display: none;
 }
 
-.is-ready .weather {
+.is-ready .controls {
   opacity: 1;
 }
 
-.weather-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
+.weather {
+  display: flex;
   flex: none;
+  gap: clamp(16px, 3.2vw, 34px);
 }
 
 .weather-word {
+  translate: 0 4px;
   appearance: none;
   border: 0;
   background: none;
   padding: 4px 0;
-  font: 400 17px/1.2 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font: 400 16px/1.2 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;
   letter-spacing: 0.005em;
   color: #c2bdb7;
   cursor: pointer;
@@ -126,51 +114,31 @@ body {
   color: #5f5a55;
 }
 
-.weather-word:focus-visible,
-.weather-sound:focus-visible {
+.weather-word:focus-visible {
   outline: none;
   text-decoration: underline;
   text-underline-offset: 4px;
 }
 
-.weather-sound {
-  appearance: none;
-  border: 0;
-  background: none;
-  padding: 2px;
-  width: 20px;
-  height: 20px;
-  color: #6f6a65;
-  cursor: pointer;
-  opacity: 0.85;
-}
-
-.weather-sound svg {
-  display: block;
-  width: 16px;
-  height: 16px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.weather-sound svg path:first-child {
-  fill: currentColor;
-  stroke: none;
-}
-
 @media (max-width: 520px) {
   .weather {
-    justify-content: flex-start;
+    gap: clamp(6px, 2vw, 12px);
   }
   .weather-word {
-    font-size: 15px;
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 360px) {
+  .weather-word {
+    font-size: 13px;
   }
 }
 
 .reset {
+  position: fixed;
+  right: max(calc(var(--backdrop-inset) + 40px), env(safe-area-inset-right));
+  bottom: max(calc(var(--backdrop-inset-bottom, var(--backdrop-inset)) + 40px), env(safe-area-inset-bottom));
   appearance: none;
   border: 0;
   background: none;
@@ -180,12 +148,12 @@ body {
   border-radius: 50%;
   display: grid;
   place-items: center;
-  color: var(--muted);
+  color: #000;
   cursor: pointer;
   opacity: 0;
   pointer-events: none;
   transform: rotate(-40deg);
-  transition: opacity 500ms ease, transform 500ms ease, color 160ms ease;
+  transition: opacity 500ms ease, transform 500ms ease;
 }
 
 .reset[hidden] {
@@ -200,18 +168,14 @@ body {
   transform: none;
 }
 
-.reset:hover {
-  color: var(--ink);
-}
-
 .reset:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px #9ec3e6;
 }
 
 .reset svg {
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
   fill: none;
   stroke: currentColor;
   stroke-width: 1.6;
@@ -235,6 +199,7 @@ noscript .fallback,
 }
 
 .no-webgl .controls,
+.no-webgl .reset,
 .no-webgl #scene {
   display: none;
 }

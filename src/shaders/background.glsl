@@ -7,7 +7,7 @@
 
 uniform vec4 uWeatherA; // snow, rain, normal, summer
 uniform float uWeatherB; // brutal summer
-uniform float uTopInset; // room kept clear for the weather words (px)
+uniform vec2 uBackdropInsetsY; // top and bottom margins in render pixels
 
 float fbm2(vec2 p) {
   float a = 0.5;
@@ -112,9 +112,10 @@ vec3 sceneBrutal(vec2 uv, vec2 q, float t, vec2 sun) {
 /** Background colour at a pixel (linear-ish display colour, already final). */
 vec3 background(vec2 fc) {
   float m = min(uRes.x, uRes.y);
-  // the painting sits below the line of weather words
-  vec2 c = vec2(0.5 * uRes.x, 0.5 * (uRes.y - uTopInset));
-  vec2 hs = vec2(0.5 * uRes.x, 0.5 * (uRes.y - uTopInset)) - 0.055 * m;
+  float bottom = uBackdropInsetsY.y;
+  float top = uRes.y - uBackdropInsetsY.x;
+  vec2 c = vec2(0.5 * uRes.x, 0.5 * (top + bottom));
+  vec2 hs = vec2(c.x - 0.055 * m, 0.5 * (top - bottom));
   float r = 0.07 * m;
   float blur = 0.04 * m;
   vec2 q = fc / m;

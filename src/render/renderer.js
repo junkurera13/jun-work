@@ -109,7 +109,7 @@ export class Renderer {
     gl.uniform1i(this.u.uDyn, 1);
     gl.uniform1i(this.u.uTextTex, 2);
     this.bu = {};
-    for (const name of ["uRes", "uTime", "uWeatherA", "uWeatherB", "uTopInset"]) this.bu[name] = gl.getUniformLocation(this.bgProg, name);
+    for (const name of ["uRes", "uTime", "uWeatherA", "uWeatherB", "uBackdropInsetsY"]) this.bu[name] = gl.getUniformLocation(this.bgProg, name);
   }
 
   floatTex(w, h) {
@@ -210,6 +210,9 @@ export class Renderer {
     const gl = this.gl;
     const W = this.canvas.width;
     const H = this.canvas.height;
+    const scaleY = H / Math.max(1, this.canvas.clientHeight);
+    const backdropTop = U.backdropInsetTop * scaleY;
+    const backdropBottom = U.backdropInsetBottom * scaleY;
     gl.viewport(0, 0, W, H);
     gl.disable(gl.SCISSOR_TEST);
     gl.bindVertexArray(this.vao);
@@ -219,7 +222,7 @@ export class Renderer {
     gl.uniform1f(this.bu.uTime, U.time);
     gl.uniform4fv(this.bu.uWeatherA, U.weatherA);
     gl.uniform1f(this.bu.uWeatherB, U.weatherB);
-    gl.uniform1f(this.bu.uTopInset, U.topInset * (W / Math.max(1, this.canvas.clientWidth)));
+    gl.uniform2f(this.bu.uBackdropInsetsY, backdropTop, backdropBottom);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     // 2. the ice cream, only where it can be
     if (scissor) {
@@ -236,7 +239,7 @@ export class Renderer {
     gl.uniform2f(u.uRes, W, H);
     gl.uniform4fv(u.uWeatherA, U.weatherA);
     gl.uniform1f(u.uWeatherB, U.weatherB);
-    gl.uniform1f(u.uTopInset, U.topInset * (W / Math.max(1, this.canvas.clientWidth)));
+    gl.uniform2f(u.uBackdropInsetsY, backdropTop, backdropBottom);
     gl.uniform3fv(u.uLightTint, U.lightTint);
     gl.uniform3f(u.uCamPos, U.camPos.x, U.camPos.y, U.camPos.z);
     gl.uniformMatrix3fv(u.uCamBasis, false, U.camBasis);
