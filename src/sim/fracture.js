@@ -175,8 +175,6 @@ export class Fracture {
     else if (kind === "star") this.star(imp, now);
     else if (kind === "fork") this.fork(imp, now);
     else this.flake(imp, now);
-    // a slight dimple right under the finger
-    this.ops.push({ t: now, kind: "dimple", face: imp.face, x: imp.x, y: imp.y, r: 0.3, v: 55 });
     return kind;
   }
 
@@ -250,11 +248,17 @@ export class Fracture {
     const norm = (a) => ((a % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
     rays.sort((p, q) => norm(p.ang) - norm(q.ang));
     const rho = rand(0.35, 0.7);
-    for (let i = 0; i < rays.length; i++) {
+    // only one or two short ring cracks: a full ring looks like a symbol
+    let arcs = 0;
+    const maxArcs = Math.random() < 0.5 ? 1 : 2;
+    const start = Math.floor(rand(0, rays.length));
+    for (let jj = 0; jj < rays.length && arcs < maxArcs; jj++) {
+      const i = (start + jj) % rays.length;
       const A = rays[i];
       const B = rays[(i + 1) % rays.length];
       const reach = (ray) => (ray.pts.length - 1) * STEP > rho + 0.05;
       if (!reach(A) || !reach(B) || Math.random() > 0.65) continue;
+      arcs++;
       const a0 = norm(A.ang);
       let a1 = norm(B.ang);
       while (a1 <= a0) a1 += Math.PI * 2;
@@ -340,7 +344,6 @@ export class Fracture {
       const a = Math.atan2(sy - y, sx - x) + rand(-0.4, 0.4);
       this.track(imp, this.growCrack(face, sx, sy, a, rand(0.5, 1.8), id, 60 + i, now + 0.03, rand(0.07, 0.11), 0.1));
     }
-    this.ops.push({ t: now + 0.04, kind: "dimple", face, x, y, r: rr + 0.45, v: 70 });
   }
 
   /** Pressing the same spot again: crush it into a small hole. */
@@ -493,13 +496,15 @@ export class Fracture {
     lin.addColorStop(1, `rgba(0,0,${op.v},0)`);
     t.fillStyle = lin;
     t.fillRect(ox, oy, w, h);
-    // fade out towards the ends of the crack
+    // ease off towards both ends of the crack (straight-edged, so the plate
+    // reads as a flat piece hinging, not a round dent)
     t.globalCompositeOperation = "destination-in";
-    const half = Math.hypot(ex - sx, ey - sy) / 2 + W * 0.3;
-    const rad = t.createRadialGradient(mx, my, half * 0.35, mx, my, half * 1.05);
-    rad.addColorStop(0, "rgba(0,0,0,1)");
-    rad.addColorStop(1, "rgba(0,0,0,0)");
-    t.fillStyle = rad;
+    const along = t.createLinearGradient(sx, sy, ex, ey);
+    along.addColorStop(0, "rgba(0,0,0,0)");
+    along.addColorStop(0.18, "rgba(0,0,0,1)");
+    along.addColorStop(0.82, "rgba(0,0,0,1)");
+    along.addColorStop(1, "rgba(0,0,0,0)");
+    t.fillStyle = along;
     t.fillRect(ox, oy, w, h);
     t.restore();
     this.g.drawImage(c, 0, 0, w, h, ox, oy, w, h);

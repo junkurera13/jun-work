@@ -65,6 +65,7 @@ struct Parts {
   float fill;
   float hole;
   float sink;
+  float cao;
   vec3 q;
 };
 
@@ -98,12 +99,23 @@ float bodyOuter(vec3 p, out vec3 q, out float hn) {
 // texture over the shell (reference space; front face left, back face right):
 // R = crack/hole mask, G = halo where squeezed vanilla may show, B = push-in.
 // Returns the groove field (negative inside a crack or hole).
-float crackField(vec3 q, out float sink, out float fill, out float inHole, out float holeEdge) {
+float crackField(vec3 q, out float sink, out float fill, out float inHole, out float holeEdge,
+                 out float recess, out float gapAO) {
   float face = q.z >= 0.0 ? 0.0 : 1.0;
   vec2 uv = vec2(((q.x + 3.2) / 6.4 + face) * 0.5, (6.1 - q.y) / 11.52);
-  vec4 t = texture(uCrackTex, uv);
+  vec4 t = textureLod(uCrackTex, uv, 0.0);
+  // blurred copies of the crack mask (mip levels): how much crack is nearby
+  float near = textureLod(uCrackTex, uv, 2.0).r;
+  float wide = textureLod(uCrackTex, uv, 3.5).r;
   float heal = 1.0 - smoothstep(0.45, 0.85, uMeltC);
-  sink = t.b * 0.075 * heal;
+  // pushed-in plates, plus chipped, rounded lips curling down into each crack
+  float lip = 0.045 * smoothstep(0.04, 0.5, near) * (1.0 - smoothstep(0.35, 0.6, t.r));
+  sink = (t.b * 0.13 + lip) * heal;
+  // the soft ice cream under a crack is pushed down and away: you look down
+  // into the gap past the chocolate walls
+  recess = 0.16 * smoothstep(0.03, 0.45, wide) * heal;
+  // narrow, deep gaps are shadowed inside; wide openings stay bright
+  gapAO = mix(0.42, 1.0, smoothstep(0.15, 0.75, near));
   fill = uOoze * smoothstep(0.04, 0.45, t.g) * heal;
   inHole = step(0.6, t.g) * step(0.9, t.r);
   holeEdge = inHole > 0.5 ? -0.2 : 1e5;
@@ -122,11 +134,12 @@ void bodyEval(vec3 p, inout Parts P) {
   float dCore = dO + tcE;
   float dShell = dO;
   if (uCracks > 0.5 && dO < 0.35 && dO > -0.6) {
-    float sink, fill, inHole, holeEdge;
-    float vd = crackField(q, sink, fill, inHole, holeEdge);
+    float sink, fill, inHole, holeEdge, recess, gapAO;
+    float vd = crackField(q, sink, fill, inHole, holeEdge, recess, gapAO);
     // the press pushes shell and ice cream in together
     dShell = max(dO + sink, -vd);
-    dCore += sink;
+    dCore += sink + recess;
+    P.cao = gapAO;
     P.sink = sink;
     P.fill = fill;
     P.hole = inHole;
@@ -241,7 +254,7 @@ const vec3 BODY_MAX = vec3(3.5, 6.0, 2.45);
 float scene(vec3 p, bool full, out Parts P) {
   P.shell = 1e5; P.core = 1e5; P.body = 1e5; P.stick = 1e5;
   P.liq = 1e5; P.liqC = 0.0; P.frag = 1e5; P.fragSide = 0.0; P.crumb = 1e5;
-  P.outer = 1e5; P.hn = 0.0; P.fill = 0.0; P.hole = 0.0; P.sink = 0.0; P.q = p;
+  P.outer = 1e5; P.hn = 0.0; P.fill = 0.0; P.hole = 0.0; P.sink = 0.0; P.cao = 1.0; P.q = p;
 
   vec3 o = max(BODY_MIN - p, p - BODY_MAX);
   float bb = length(max(o, 0.0));
@@ -502,6 +515,8 @@ vec3 shade(vec3 p, vec3 rd, float pix) {
     } else {
       float vm = clamp(uMeltV * 1.15 + P.fill * 0.6 + P.hole * uMeltV * 0.4, 0.0, 1.0);
       bm = vanilla(vm);
+      bm.albedo *= P.cao;
+      bm.spec *= P.cao;
       bumpAmp = mix(0.42, 0.04, vm); bumpFreq = 21.0;
       bumpAmp2 = mix(0.08, 0.0, vm); bumpFreq2 = 3.0;
     }
