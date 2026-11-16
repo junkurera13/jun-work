@@ -3,6 +3,8 @@ import { Renderer } from "./render/renderer.js";
 import { engravingCanvas } from "./render/engraving.js";
 import { CrackAudio } from "./audio/crack.js";
 import { WeatherPicker } from "./ui/weather.js";
+import { Dock } from "./ui/dock.js";
+import { FLAVORS } from "./flavors.js";
 import { Fracture } from "./sim/fracture.js";
 import { Liquid } from "./sim/liquid.js";
 import { MELT_SECONDS, WEATHERS, WEATHER_DEFAULT, meltParams } from "./sim/melt.js";
@@ -13,7 +15,7 @@ const canvas = document.querySelector("#scene");
 const controls = document.querySelector(".controls");
 const weatherRoot = document.querySelector(".weather");
 const resetBtn = document.querySelector(".reset");
-const flavorButtons = document.querySelectorAll(".flavor");
+const dockRoot = document.querySelector(".flavors");
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 const FOV = (24 * Math.PI) / 180;
@@ -35,7 +37,8 @@ const liquid = new Liquid();
 
 const state = {
   P: 0,
-  faluda: false,
+  flavor: 0,
+  faluda: FLAVORS[0].faluda,
   weather: WEATHER_DEFAULT,
   // eased blend of the weathers (for the painted sky, light and melt speed)
   weatherW: WEATHERS.map((_, i) => (i === WEATHER_DEFAULT ? 1 : 0)),
@@ -258,7 +261,7 @@ window.addEventListener("pointercancel", onUp);
 canvas.addEventListener("contextmenu", (e) => e.preventDefault());
 
 window.addEventListener("keydown", (e) => {
-  if (e.target === resetBtn || e.target.closest?.(".controls, .flavors")) return;
+  if (e.target === resetBtn || e.target.closest?.(".controls, .dock")) return;
   if (e.key === "ArrowLeft") state.yawVel -= 2;
   if (e.key === "ArrowRight") state.yawVel += 2;
 });
@@ -297,20 +300,80 @@ resetBtn.addEventListener("click", () => {
   newIceCream();
 });
 
-for (const button of flavorButtons) {
-  button.addEventListener("click", () => {
-    const faluda = button.dataset.flavor === "faluda";
-    if (faluda === state.faluda) return;
-    state.faluda = faluda;
-    audio.material = faluda ? "ice" : "choc";
-    for (const option of flavorButtons) option.setAttribute("aria-pressed", String(option === button));
-    canvas.setAttribute("aria-label", faluda
-      ? "A pink Faluda popsicle with a vanilla ice cream center. Tap to crack the icy shell."
-      : "A Magic Choc vanilla ice cream. Tap it to crack the chocolate shell; it melts slowly.");
-    pointer = null;
-    state.shake = 0;
-    canvas.classList.remove("is-dragging", "is-hover");
-    newIceCream();
+function selectFlavor(i) {
+  if (i === state.flavor) return;
+  const flavor = FLAVORS[i];
+  state.flavor = i;
+  state.faluda = flavor.faluda;
+  audio.material = flavor.shell;
+  canvas.setAttribute("aria-label", flavor.label);
+  pointer = null;
+  state.shake = 0;
+  canvas.classList.remove("is-dragging", "is-hover");
+  newIceCream();
+}
+
+const dock = new Dock(dockRoot, {
+  items: FLAVORS,
+  value: state.flavor,
+  reduceMotion,
+  onChange: (i) => {
+    audio.tick(1.1 + i * 0.12);
+    selectFlavor(i);
+  },
+});
+
+// Each dock icon is the real ice cream, rendered once by the same shader:
+// fresh from the freezer, standing at a jaunty angle.
+function renderDockIcons() {
+  const px = 168;
+  const ss = 2; // supersampled, then scaled down for smooth edges
+  const D = 7.1 / TAN;
+  const elev = 0.12;
+  const eye = { x: 0, y: Math.sin(elev) * D, z: Math.cos(elev) * D };
+  const f = norm({ x: -eye.x, y: -eye.y, z: -eye.z });
+  const r = norm(cross(f, { x: 0, y: 1, z: 0 }));
+  const u = cross(r, f);
+  const q = quatMul(quatFromAxisAngle(0, 0, 1, -0.36), quatFromAxisAngle(0, 1, 0, -0.5));
+  const rot = mat3FromQuat(q);
+  const c = mulMat3(rot, 0, OBJ_CENTER_Y, 0);
+  const rel = { x: eye.x + c.x, y: eye.y + c.y, z: eye.z + c.z }; // eye relative to the object
+  const camObj = mulMat3T(rot, rel.x, rel.y, rel.z);
+  const ro = mulMat3T(rot, r.x, r.y, r.z);
+  const uo = mulMat3T(rot, u.x, u.y, u.z);
+  const fo = mulMat3T(rot, f.x, f.y, f.z);
+  FLAVORS.forEach((flavor, i) => {
+    const img = renderer.thumbnail(
+      {
+        camPos: camObj,
+        camBasis: [ro.x, ro.y, ro.z, uo.x, uo.y, uo.z, fo.x, fo.y, fo.z],
+        tanHalfFov: TAN,
+        objRot: rot,
+        time: 0,
+        boundMin: [BODY_BOX.min[0], STICK_Y0 - 0.2, BODY_BOX.min[2]],
+        boundMax: BODY_BOX.max,
+        melt: meltParams(0, flavor.faluda),
+        cracks: false,
+        ooze: 0,
+        primCount: 0,
+        crumbCount: 0,
+        liqMin: [0, 0, 0],
+        liqMax: [0, 0, 0],
+        exposure: 1.0,
+        weatherA: [0, 0, 1, 0],
+        weatherB: 0,
+        lightTint: [1, 1, 1],
+      },
+      px * ss,
+      px * ss,
+    );
+    const out = document.createElement("canvas");
+    out.width = px;
+    out.height = px;
+    const g = out.getContext("2d");
+    g.imageSmoothingQuality = "high";
+    g.drawImage(img, 0, 0, px, px);
+    dock.setIcon(i, out.toDataURL("image/png"));
   });
 }
 
@@ -491,6 +554,7 @@ if (renderer) {
     .ready()
     .then(() => {
       renderer.uploadCracks(fracture.canvas);
+      renderDockIcons();
       document.body.classList.add("is-ready");
       state.appear = 0;
       last = performance.now();

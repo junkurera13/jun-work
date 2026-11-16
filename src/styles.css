@@ -93,8 +93,7 @@ body {
   gap: clamp(16px, 3.2vw, 34px);
 }
 
-.weather-word,
-.flavor {
+.weather-word {
   appearance: none;
   border: 0;
   background: none;
@@ -111,45 +110,135 @@ body {
   font-size: 15px;
 }
 
-.weather-word:hover,
-.flavor:hover {
+.weather-word:hover {
   color: #8f8a84;
 }
 
-.weather-word.is-on,
-.flavor[aria-pressed="true"] {
+.weather-word.is-on {
   color: #5f5a55;
 }
 
-.weather-word:focus-visible,
-.flavor:focus-visible {
+.weather-word:focus-visible {
   outline: none;
   text-decoration: underline;
   text-underline-offset: 4px;
 }
 
-.flavors {
+/* ---------------------------------------------------------------- dock --- */
+
+.dock {
+  --dock-size: 44px;
+  --dock-gap: 10px;
   position: fixed;
-  bottom: max(4px, env(safe-area-inset-bottom));
   left: 50%;
+  bottom: max(10px, env(safe-area-inset-bottom));
   translate: -50% 0;
+  z-index: 2;
   display: flex;
-  gap: 18px;
-  white-space: nowrap;
+  align-items: flex-end;
+  gap: var(--dock-gap);
+  padding: 0 10px 11px;
   opacity: 0;
   visibility: hidden;
-  transition: opacity 900ms ease 400ms;
+  transform: translateY(14px);
+  transition: opacity 900ms ease 400ms, transform 900ms cubic-bezier(0.2, 0.8, 0.2, 1) 400ms, visibility 0s 400ms;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.is-ready .flavors {
+.is-ready .dock {
   opacity: 1;
   visibility: visible;
+  transform: none;
 }
 
-.flavor {
-  min-height: 32px;
-  font-size: 14px;
-  color: #756f69;
+.dock-item {
+  --s: 1;
+  position: relative;
+  flex: none;
+  width: calc(var(--dock-size) * var(--s));
+  height: calc(var(--dock-size) * var(--s));
+  appearance: none;
+  border: 0;
+  background: none;
+  padding: 0;
+  border-radius: 12px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.dock-icon {
+  display: block;
+  width: 100%;
+  height: 100%;
+  transition: scale 160ms ease;
+}
+
+.dock-icon img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+  filter: drop-shadow(0 2px 2.5px rgba(50, 30, 20, 0.22));
+}
+
+.dock-item:active .dock-icon {
+  scale: 0.92;
+}
+
+/* the dot under the one that's out */
+.dock-dot {
+  position: absolute;
+  left: 50%;
+  bottom: -8px;
+  width: 4px;
+  height: 4px;
+  margin-left: -2px;
+  border-radius: 50%;
+  background: #5f5a55;
+  opacity: 0;
+  transition: opacity 300ms ease;
+}
+
+.dock-item[aria-checked="true"] .dock-dot {
+  opacity: 0.8;
+}
+
+/* the name, floating over the icon you're on (plain text, like the weather words) */
+.dock-label {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 10px);
+  translate: -50% 4px;
+  font: 400 13px/1.2 "Neue Montreal", ui-sans-serif, -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  letter-spacing: 0.005em;
+  white-space: nowrap;
+  color: #5f5a55;
+  text-shadow: 0 0 6px rgba(255, 255, 255, 0.9), 0 0 2px rgba(255, 255, 255, 0.8);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease, translate 160ms ease;
+}
+
+@media (hover: hover) {
+  .dock-item:hover .dock-label {
+    opacity: 1;
+    translate: -50% 0;
+  }
+}
+
+.dock-item:focus-visible {
+  outline: none;
+}
+
+.dock-item:focus-visible .dock-label {
+  opacity: 1;
+  translate: -50% 0;
+}
+
+.dock-item:focus-visible .dock-icon img {
+  filter: drop-shadow(0 2px 2.5px rgba(50, 30, 20, 0.22)) drop-shadow(0 0 3px #9ec3e6);
 }
 
 @media (max-width: 520px) {
@@ -158,6 +247,10 @@ body {
   }
   .weather-word {
     font-size: 13px;
+  }
+  .dock {
+    --dock-size: 42px;
+    --dock-gap: 8px;
   }
 }
 
@@ -231,7 +324,7 @@ noscript .fallback,
 }
 
 .no-webgl .controls,
-.no-webgl .flavors,
+.no-webgl .dock,
 .no-webgl .reset,
 .no-webgl #scene {
   display: none;
@@ -240,7 +333,7 @@ noscript .fallback,
 @media (prefers-reduced-motion: reduce) {
   #scene,
   .controls,
-  .flavors,
+  .dock,
   .reset {
     transition: none;
   }

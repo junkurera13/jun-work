@@ -12,6 +12,7 @@ uniform float uTanHalfFov;
 uniform mat3 uObjRot;      // object -> world rotation
 uniform float uTime;
 uniform bool uFaluda;
+uniform bool uThumb;      // dock icon: no backdrop, coverage goes to alpha
 
 uniform vec3 uBoundMin;
 uniform vec3 uBoundMax;
@@ -771,10 +772,11 @@ void main() {
   vec3 ro = uCamPos;
   float pixAngle = 2.0 * uTanHalfFov / uRes.y;
 
-  vec3 bg = background(gl_FragCoord.xy);
+  vec3 bg = uThumb ? vec3(0.0) : background(gl_FragCoord.xy);
+  float bgA = uThumb ? 0.0 : 1.0;
   float t0, t1;
   if (!boxHit(ro, rd, uBoundMin, uBoundMax, t0, t1)) {
-    outColor = vec4(bg, 1.0);
+    outColor = vec4(bg, bgA);
     return;
   }
   float t = max(t0, 0.0);
@@ -796,7 +798,7 @@ void main() {
     cov = clamp((1.0 - minRatio) / 0.7, 0.0, 1.0);
     t = tBest;
     if (cov <= 0.0) {
-      outColor = vec4(bg, 1.0);
+      outColor = vec4(bg, bgA);
       return;
     }
   }
@@ -806,5 +808,5 @@ void main() {
   col = pow(col, vec3(1.0 / 2.2));
   // tiny dither against banding in the smooth gradients
   col += (hash12(gl_FragCoord.xy + fract(uTime) * 100.0) - 0.5) / 255.0;
-  outColor = vec4(mix(bg, col, cov), 1.0);
+  outColor = uThumb ? vec4(col, cov) : vec4(mix(bg, col, cov), 1.0);
 }

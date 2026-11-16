@@ -234,8 +234,49 @@ export class Renderer {
       gl.enable(gl.SCISSOR_TEST);
       gl.scissor(x0, y0, x1 - x0, y1 - y0);
     }
+    this.drawScene(U, W, H, backdropTop, backdropBottom, false);
+  }
+
+  /**
+   * Render the ice cream alone (transparent background) into a small
+   * offscreen image, e.g. for the flavor dock. Returns a canvas.
+   */
+  thumbnail(U, w, h) {
+    const gl = this.gl;
+    const tex = gl.createTexture();
+    gl.activeTexture(gl.TEXTURE3);
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    const fb = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+    gl.viewport(0, 0, w, h);
+    gl.disable(gl.SCISSOR_TEST);
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.bindVertexArray(this.vao);
+    this.drawScene(U, w, h, 0, 0, true);
+    const px = new Uint8ClampedArray(w * h * 4);
+    gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.deleteFramebuffer(fb);
+    gl.deleteTexture(tex);
+    // GL rows run bottom-up
+    const flipped = new Uint8ClampedArray(px.length);
+    const row = w * 4;
+    for (let y = 0; y < h; y++) flipped.set(px.subarray((h - 1 - y) * row, (h - y) * row), y * row);
+    const c = document.createElement("canvas");
+    c.width = w;
+    c.height = h;
+    c.getContext("2d").putImageData(new ImageData(flipped, w, h), 0, 0);
+    return c;
+  }
+
+  drawScene(U, W, H, backdropTop, backdropBottom, thumb) {
+    const gl = this.gl;
     gl.useProgram(this.prog);
     const u = this.u;
+    gl.uniform1i(u.uThumb, thumb ? 1 : 0);
     gl.uniform2f(u.uRes, W, H);
     gl.uniform4fv(u.uWeatherA, U.weatherA);
     gl.uniform1f(u.uWeatherB, U.weatherB);
