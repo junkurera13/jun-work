@@ -9,7 +9,7 @@ export const STICK_HW = 0.95;
 export const STICK_END_R = 0.95;
 export const STICK_HT = 0.14;
 export const STICK_Y0 = -8.9;
-export const STICK_Y1 = 2.6;
+export const STICK_Y1 = -0.6;
 
 const fract = (x) => x - Math.floor(x);
 const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
@@ -169,12 +169,12 @@ export function stickHalfWidth(y) {
 
 // Waisted paddle stick, mirrors sdStickBase in scene.frag.glsl
 export function sdStick(x, y, z) {
+  // exact mirror image across the pinch
+  const ym = STICK_WAIST_Y - Math.abs(y - STICK_WAIST_Y);
   const yc0 = STICK_Y0 + STICK_END_R;
-  const yc1 = STICK_Y1 - STICK_HW;
   let d2;
-  if (y < yc0) d2 = Math.hypot(x, y - yc0) - stickHalfWidth(yc0);
-  else if (y > yc1) d2 = Math.hypot(x, y - yc1) - STICK_HW;
-  else d2 = (Math.abs(x) - stickHalfWidth(y)) * 0.95;
+  if (ym < yc0) d2 = Math.hypot(x, ym - yc0) - stickHalfWidth(yc0);
+  else d2 = (Math.abs(x) - stickHalfWidth(ym)) * 0.95;
   const re = 0.06;
   const wx = d2 + re;
   const wy = Math.abs(z) - STICK_HT + re;

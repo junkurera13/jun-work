@@ -44,8 +44,8 @@ uniform float uExposure;
 
 #include "common.glsl"
 
-const float TEXT_Y0 = -3.0;
-const float TEXT_Y1 = 2.0;
+const float TEXT_Y0 = -4.3;
+const float TEXT_Y1 = -0.72;
 const int MAX_PRIMS = 64;
 const int MAX_IMPACTS = 16;
 const int MAX_CRUMBS = 24;
@@ -250,16 +250,14 @@ float stickHalfWidth(float y) {
 }
 
 float sdStickBase(vec3 p) {
+  // the stick is an exact mirror image of itself across the pinch
+  float ym = STICK_WAIST_Y - abs(p.y - STICK_WAIST_Y);
   float yc0 = STICK_Y0 + STICK_END_R;
-  float yc1 = STICK_Y1 - STICK_HW;
   float d2;
-  if (p.y < yc0) {
-    float rb = stickHalfWidth(yc0);
-    d2 = length(vec2(p.x, p.y - yc0)) - rb;
-  } else if (p.y > yc1) {
-    d2 = length(vec2(p.x, p.y - yc1)) - STICK_HW;
+  if (ym < yc0) {
+    d2 = length(vec2(p.x, ym - yc0)) - stickHalfWidth(yc0);
   } else {
-    d2 = (abs(p.x) - stickHalfWidth(p.y)) * 0.95;
+    d2 = (abs(p.x) - stickHalfWidth(ym)) * 0.95;
   }
   float re = 0.06;
   vec2 w = vec2(d2 + re, abs(p.z) - STICK_HT + re);

@@ -12,7 +12,7 @@ const float STICK_HW = 0.95;     // half width where it enters the bar
 const float STICK_END_R = 0.95;  // radius of the broad rounded end
 const float STICK_HT = 0.14;     // half thickness (a chunky 2.8 mm)
 const float STICK_Y0 = -8.9;     // bottom extreme
-const float STICK_Y1 = 2.6;      // top extreme (inside the bar)
+const float STICK_Y1 = -0.6;     // top extreme (inside the bar): mirror of the bottom end
 const float STICK_WAIST_Y = -4.75; // narrowest point: right where it leaves the ice cream
 
 float hash12(vec2 p) {
