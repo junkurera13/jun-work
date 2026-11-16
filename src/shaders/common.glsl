@@ -8,7 +8,7 @@ const float BAR_BOTTOM = -4.8;
 const float BAR_HEIGHT = 9.6;
 const float SHELL_T = 0.08;      // chocolate shell thickness (0.8 mm)
 
-const float STICK_HW = 0.85;     // half width where it enters the bar
+const float STICK_HW = 0.95;     // half width where it enters the bar
 const float STICK_END_R = 0.95;  // radius of the broad rounded end
 const float STICK_HT = 0.14;     // half thickness (a chunky 2.8 mm)
 const float STICK_Y0 = -8.9;     // bottom extreme

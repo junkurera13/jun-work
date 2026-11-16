@@ -244,9 +244,9 @@ void bodyEval(vec3 p, inout Parts P) {
 // Half width along a Magnum-style stick. The visible handle starts narrow
 // where it leaves the ice cream and fans out to a broad rounded end; inside
 // the ice cream (hidden until it melts) it widens again into a broad paddle.
+// The flare is mirrored exactly above and below the pinch.
 float stickHalfWidth(float y) {
-  return 0.62 + 0.33 * smoothstep(STICK_WAIST_Y - 0.15, -8.0, y)
-              + 0.23 * smoothstep(STICK_WAIST_Y + 0.15, -2.6, y);
+  return 0.62 + 0.33 * smoothstep(0.15, 3.25, abs(y - STICK_WAIST_Y));
 }
 
 float sdStickBase(vec3 p) {

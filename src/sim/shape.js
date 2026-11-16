@@ -5,7 +5,7 @@
 export const BAR_BOTTOM = -4.8;
 export const BAR_HEIGHT = 9.6;
 export const SHELL_T = 0.08;
-export const STICK_HW = 0.85;
+export const STICK_HW = 0.95;
 export const STICK_END_R = 0.95;
 export const STICK_HT = 0.14;
 export const STICK_Y0 = -8.9;
@@ -164,7 +164,7 @@ export function bodyOuter(x, y, z, M) {
 export const STICK_WAIST_Y = -4.75;
 
 export function stickHalfWidth(y) {
-  return 0.62 + 0.33 * smoothstep(STICK_WAIST_Y - 0.15, -8.0, y) + 0.23 * smoothstep(STICK_WAIST_Y + 0.15, -2.6, y);
+  return 0.62 + 0.33 * smoothstep(0.15, 3.25, Math.abs(y - STICK_WAIST_Y));
 }
 
 // Waisted paddle stick, mirrors sdStickBase in scene.frag.glsl

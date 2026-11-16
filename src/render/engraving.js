@@ -3,7 +3,7 @@
 // top to bottom, as the ice cream melts off the stick.
 
 export function engravingCanvas() {
-  // maps onto the stick's 1.7 cm width and the 5 cm text band
+  // maps onto the stick's 1.9 cm width and the 5 cm text band
   const W = 384;
   const H = 1248;
   const c = document.createElement("canvas");
@@ -27,7 +27,7 @@ export function engravingCanvas() {
     g.save();
     g.translate(W / 2 + jx * 2, slot * (i + 0.5) + (i > 3 ? -slot * 0.5 : 0) + 4);
     g.rotate(jx * 0.015);
-    g.scale(0.9, 1); // keep letters in proportion on the stick
+    g.scale(0.81, 1); // keep letters in proportion on the stick
     g.fillText(ch, 0, 0);
     g.restore();
   });
