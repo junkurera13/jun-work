@@ -99,8 +99,9 @@ float bodyOuter(vec3 p, out vec3 q, out float hn) {
 // texture over the shell (reference space; front face left, back face right):
 // R = crack/hole mask, G = halo where squeezed vanilla may show, B = push-in.
 // Returns the groove field (negative inside a crack or hole).
-// Chart that wraps all the way around the bar (mirrors toChart in shape.js).
-float crackU(vec3 q) {
+// Chart that wraps all the way around the bar (mirrors toChart in shape.js),
+// as a fraction of the way around: the texture repeats, so there's no seam.
+float crackS(vec3 q) {
   float y = q.y;
   float a = mix(2.98, 2.58, smoothstep(-3.2, 5.6, y));
   float n = mix(3.2, 2.62, smoothstep(-4.8, 5.6, y));
@@ -110,12 +111,12 @@ float crackU(vec3 q) {
   float R = 0.5 * (W + T);
   float e = (W - T) / (W + T);
   float phi = atan(q.x / W, q.z / T);
-  return R * (phi - 0.5 * e * sin(2.0 * phi));
+  return (phi - 0.5 * e * sin(2.0 * phi)) / 6.2831853;
 }
 
 float crackField(vec3 q, out float sink, out float fill, out float inHole, out float holeEdge,
                  out float recess, out float gapAO) {
-  vec2 uv = vec2((crackU(q) + 8.96) / 17.92, (6.1 - q.y) / 11.52);
+  vec2 uv = vec2(crackS(q) + 0.5, (6.1 - q.y) / 11.52);
   vec4 t = textureLod(uCrackTex, uv, 0.0);
   // blurred copies of the crack mask (mip levels): how much crack is nearby
   float near = textureLod(uCrackTex, uv, 2.0).r;

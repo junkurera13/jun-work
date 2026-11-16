@@ -7,10 +7,9 @@ import { mulMat3, quatIntegrate, rand } from "./math.js";
 //   R  crack / crushed-hole mask (the shell is missing where R > 0.5)
 //   G  soft halo around cracks: where squeezed-out vanilla can show
 //   B  how far that bit of shell has been pushed into the ice cream
-export const CRACK_W = 1792;
+export const CRACK_W = 1536;
 export const CRACK_H = 1152;
 const PX = 100; // texels per cm
-const U_HALF = CRACK_W / PX / 2; // u runs -8.96 .. 8.96 cm
 const Y1 = 6.1; // top of the mapped area (bottom is Y1 - CRACK_H / PX = -5.42)
 const GRAVITY = 900; // cm/s^2
 const STEP = 0.055;
@@ -35,6 +34,11 @@ function clipHalf(poly, a, b) {
     }
   }
   return out;
+}
+
+/** Distance once around the bar at height y (cm). */
+function period(y) {
+  return 2 * Math.PI * crossSection(y).R;
 }
 
 function pointInPoly(x, y, poly) {
@@ -94,36 +98,44 @@ export class Fracture {
     this.any = false;
     this.texDirty = true;
     this.nextId = 1;
+    this.off = 0;
   }
 
+  /**
+   * Chart (u cm around the bar, y) -> texel. The texture's x is the fraction
+   * of the way around the bar and it repeats, so there is no seam anywhere.
+   */
   px(face, u, y) {
-    return [(u + U_HALF) * PX, (Y1 - y) * PX];
+    return [(u / period(y) + 0.5) * CRACK_W + this.off, (Y1 - y) * PX];
   }
 
   /** Is chart point (u, y) on the shell? Stops short of the back seam and the very ends. */
   onShell(u, y) {
-    const c = crossSection(y);
-    return c.W > 0.45 && Math.abs(u) < Math.PI * c.R - 0.04;
+    return crossSection(y).W > 0.45;
   }
 
   /** Does a step a->b run into an existing crack? Returns t in [0,1] or -1. */
   arrest(face, ax, ay, bx, by, impactId, pathId, nearOrigin) {
     let best = -1;
     const list = this.segs[face];
-    const minx = Math.min(ax, bx) - 1e-3;
-    const maxx = Math.max(ax, bx) + 1e-3;
+    const P = period((ay + by) / 2);
     const miny = Math.min(ay, by) - 1e-3;
     const maxy = Math.max(ay, by) + 1e-3;
-    for (let i = 0; i < list.length; i++) {
-      const s = list[i];
-      if (s[4] === impactId && (s[5] === pathId || nearOrigin)) continue;
-      if (Math.max(s[0], s[2]) < minx || Math.min(s[0], s[2]) > maxx) continue;
-      if (Math.max(s[1], s[3]) < miny || Math.min(s[1], s[3]) > maxy) continue;
-      const t = segHit(ax, ay, bx, by, s[0], s[1], s[2], s[3]);
-      if (t >= 0 && (best < 0 || t < best)) best = t;
+    for (const shift of [0, P, -P]) {
+      const minx = Math.min(ax, bx) - 1e-3 + shift;
+      const maxx = Math.max(ax, bx) + 1e-3 + shift;
+      for (let i = 0; i < list.length; i++) {
+        const s = list[i];
+        if (s[4] === impactId && (s[5] === pathId || nearOrigin)) continue;
+        if (Math.max(s[1], s[3]) < miny || Math.min(s[1], s[3]) > maxy) continue;
+        if (Math.max(s[0], s[2]) < minx || Math.min(s[0], s[2]) > maxx) continue;
+        const t = segHit(ax + shift, ay, bx + shift, by, s[0], s[1], s[2], s[3]);
+        if (t >= 0 && (best < 0 || t < best)) best = t;
+      }
     }
     return best;
   }
+
 
   /** A press on the shell at a hit point (object space). */
   press(hit, now, M, world) {
@@ -168,7 +180,8 @@ export class Fracture {
       if (imp.face !== face) continue;
       for (const c of imp.cells) {
         if (!c.closed) continue;
-        if (pointInPoly(x, y, c.poly)) return c;
+        const P = period(y);
+        if (pointInPoly(x, y, c.poly) || pointInPoly(x + P, y, c.poly) || pointInPoly(x - P, y, c.poly)) return c;
       }
     }
     return null;
@@ -396,7 +409,16 @@ export class Fracture {
     g.closePath();
   }
 
+  /** Draw an op, plus wrapped copies so anything crossing the back joins up. */
   draw(op) {
+    for (const off of [-CRACK_W, 0, CRACK_W]) {
+      this.off = off;
+      this.drawOnce(op);
+    }
+    this.off = 0;
+  }
+
+  drawOnce(op) {
     const g = this.g;
     if (op.kind === "line") {
       const [ax, ay] = this.px(op.face, op.ax, op.ay);
