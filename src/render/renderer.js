@@ -188,10 +188,22 @@ export class Renderer {
     const sorted = [...this.frameTimes].sort((a, b) => a - b);
     const med = sorted[sorted.length >> 1];
     this.frameTimes.length = 0;
-    const before = this.scale;
-    if (med > 24) this.scale = Math.max(0.45, this.scale * 0.85);
-    else if (med < 14.5 && this.scale < 1) this.scale = Math.min(1, this.scale * 1.08);
-    if (Math.abs(before - this.scale) > 1e-3) this.resize(true);
+    // Only change the scale here. Resizing the canvas wipes it, so the new
+    // size is applied by resize() at the start of the next frame, right
+    // before drawing (doing it after a draw flashed a blank frame).
+    // Going up needs a long run of fast frames, so it doesn't flip-flop.
+    if (med > 24) {
+      this.scale = Math.max(0.45, this.scale * 0.85);
+      this.fastRuns = 0;
+    } else if (med < 13 && this.scale < 1) {
+      this.fastRuns = (this.fastRuns || 0) + 1;
+      if (this.fastRuns >= 3) {
+        this.scale = Math.min(1, this.scale * 1.08);
+        this.fastRuns = 0;
+      }
+    } else {
+      this.fastRuns = 0;
+    }
   }
 
   draw(U, scissor) {
