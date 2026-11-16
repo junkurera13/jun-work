@@ -99,7 +99,7 @@ export function sn3(x, y, z) {
 export function sdBar(x, y, z) {
   const a = mix(2.98, 2.58, smoothstep(-3.2, 5.6, y));
   const b = 5.2;
-  const c = 1.2;
+  const c = 1.55;
   const n = mix(3.2, 2.62, smoothstep(-4.8, 5.6, y));
   const m = 2.6;
   const sx = Math.max(Math.abs(x) / a, 1e-5);
@@ -118,9 +118,9 @@ export function sdBar(x, y, z) {
 export function sdBlob(x, y, z) {
   const cx = x / 2.5;
   const cy = (y - 0.1) / 4.9;
-  const cz = z / 1.08;
+  const cz = z / 1.4;
   const k0 = Math.hypot(cx, cy, cz);
-  const k1 = Math.hypot(cx / 2.5, cy / 4.9, cz / 1.08);
+  const k1 = Math.hypot(cx / 2.5, cy / 4.9, cz / 1.4);
   return (k0 * (k0 - 1)) / Math.max(k1, 1e-4);
 }
 

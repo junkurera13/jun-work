@@ -325,8 +325,8 @@ float crumbs(vec3 p) {
 
 // --------------------------------------------------------------- scene ----
 
-const vec3 BODY_MIN = vec3(-3.5, -10.1, -1.75);
-const vec3 BODY_MAX = vec3(3.5, 6.0, 1.75);
+const vec3 BODY_MIN = vec3(-3.5, -10.1, -2.1);
+const vec3 BODY_MAX = vec3(3.5, 6.0, 2.1);
 
 float scene(vec3 p, bool full, out Parts P) {
   P.shell = 1e5; P.core = 1e5; P.body = 1e5; P.stick = 1e5;

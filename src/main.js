@@ -285,7 +285,7 @@ resetBtn.addEventListener("click", () => {
 
 // ----------------------------------------------------------------- loop ----
 
-const BODY_BOX = { min: [-3.6, -10.05, -1.8], max: [3.6, 6.05, 1.8] };
+const BODY_BOX = { min: [-3.6, -10.05, -2.15], max: [3.6, 6.05, 2.15] };
 
 function sceneBounds() {
   const min = BODY_BOX.min.slice();
