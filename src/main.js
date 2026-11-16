@@ -452,4 +452,5 @@ window.__ice = {
   setTemp: (t) => dial.set(t),
   tap: (x, y) => onDown({ clientX: x, clientY: y, pointerId: 1, button: 0 }) || onUp({ pointerId: 1 }),
   renew: newIceCream,
+  fracture,
 };

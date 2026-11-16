@@ -147,24 +147,6 @@ export class CrackAudio {
     }
   }
 
-  /** the shell giving way a little more under a held press */
-  crackle(pan = 0, strength = 1) {
-    const ctx = this.ctx;
-    if (!ctx || this.muted || ctx.state !== "running") return;
-    const t0 = ctx.currentTime + 0.003;
-    const dest = this.out(pan);
-    const s = 0.45 + 0.25 * Math.min(1.5, strength);
-    const n = 3 + Math.floor(rnd(0, 5));
-    let t = t0;
-    for (let i = 0; i < n; i++) {
-      t += rnd(0.004, 0.022);
-      this.grain(dest, t, { dur: rnd(0.002, 0.006), freq: rnd(2000, 7500), q: rnd(1.5, 5), gain: rnd(0.25, 0.6) * s });
-      if (Math.random() < 0.3) this.tock(dest, t, rnd(700, 1500), 0.07 * s, 0.014);
-    }
-    // soft, wet give of the ice cream underneath
-    this.grain(dest, t0, { dur: 0.07, freq: 380, q: 0.7, gain: 0.08 * s, type: "lowpass", attack: 0.01 });
-  }
-
   /** dial detent */
   tick(pitch = 1) {
     const ctx = this.ensure();

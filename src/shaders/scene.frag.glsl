@@ -113,10 +113,10 @@ float crackField(vec3 q, out float sink, out float fill, out float inHole, out f
   sink = (t.b * 0.13 + lip) * heal;
   // the soft ice cream under a crack is pushed down and away: you look down
   // into the gap past the chocolate walls
-  recess = 0.16 * smoothstep(0.03, 0.45, wide) * heal;
+  recess = 0.09 * smoothstep(0.03, 0.45, wide) * heal;
   // narrow, deep gaps are shadowed inside; wide openings stay bright
-  gapAO = mix(0.42, 1.0, smoothstep(0.15, 0.75, near));
-  fill = uOoze * smoothstep(0.04, 0.45, t.g) * heal;
+  gapAO = mix(0.72, 1.0, smoothstep(0.12, 0.6, near));
+  fill = uOoze * heal;
   inHole = step(0.6, t.g) * step(0.9, t.r);
   holeEdge = inHole > 0.5 ? -0.2 : 1e5;
   // R crosses 0.5 at the crack edge; ~1 texel (0.01 cm) per 0.5 of mask
@@ -148,8 +148,11 @@ void bodyEval(vec3 p, inout Parts P) {
       dCore += 0.2 * uMeltV * smoothstep(0.0, 0.4, -holeEdge);
     }
     if (fill > 0.0) {
-      float dFill = max(dO + sink + tcE * (1.0 - fill) - 0.028 * fill * fill, vd - 0.02 * fill);
-      dCore = smin(dCore, dFill, 0.03);
+      // softened vanilla creeps up *inside* the cracks, a little more as it
+      // melts, until it forms a thin glossy bead along the crack line
+      float level = dO + sink + (tcE + recess) * (1.0 - fill) - 0.018 * fill * fill;
+      float dFill = max(level, vd - 0.012 * fill);
+      dCore = smin(dCore, dFill, 0.02);
     }
   }
   if (uChocGone > 0.0) {

@@ -2,10 +2,9 @@
 
 A blank white page with one Magic Choc vanilla ice cream on it.
 
-- **Tap / click** the chocolate shell to break it. Every press is its own fracture: a long split
-  across the bar, a star of cracks with plates pushed in, a forking crack, or a chunk popping out.
-  New cracks stop where they meet old ones, so the shell breaks up more and more. Press the same
-  spot again to crush it.
+- **Tap / click** the chocolate shell to break it: a patch around your finger snaps into
+  irregular plates that sink into the soft ice cream. Cracks stop where they meet older ones, so
+  the shell breaks up finer the more you press. Press a broken plate again to pop it out.
 - **Drag** to turn it around.
 - It **melts** slowly by itself: the vanilla goes first, leaking from the bottom (and
   welling up through any cracks), then the chocolate softens. Drips run down the

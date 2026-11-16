@@ -14,8 +14,39 @@ const X1 = 3.2;
 const Y1 = 6.1; // top of the mapped area (bottom is Y1 - CRACK_H / PX = -5.42)
 const PX = FACE_W / (X1 - X0); // texels per cm (100)
 const GRAVITY = 900; // cm/s^2
-const CRACK_SPEED = 26; // cm/s: fast, but you can still see it run
 const STEP = 0.055;
+
+/** Keep the part of a convex polygon closer to seed a than to seed b. */
+function clipHalf(poly, a, b) {
+  const mx = (a[0] + b[0]) / 2;
+  const my = (a[1] + b[1]) / 2;
+  const nx = b[0] - a[0];
+  const ny = b[1] - a[1];
+  const side = (p) => (p[0] - mx) * nx + (p[1] - my) * ny;
+  const out = [];
+  for (let i = 0; i < poly.length; i++) {
+    const P = poly[i];
+    const Q = poly[(i + 1) % poly.length];
+    const sp = side(P);
+    const sq = side(Q);
+    if (sp <= 0) out.push(P);
+    if ((sp < 0 && sq > 0) || (sp > 0 && sq < 0)) {
+      const t = sp / (sp - sq);
+      out.push([P[0] + (Q[0] - P[0]) * t, P[1] + (Q[1] - P[1]) * t]);
+    }
+  }
+  return out;
+}
+
+function pointInPoly(x, y, poly) {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [xi, yi] = poly[i];
+    const [xj, yj] = poly[j];
+    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
 
 function segHit(ax, ay, bx, by, cx, cy, dx, dy) {
   // intersection parameter along a->b with segment c->d, or -1
@@ -31,13 +62,13 @@ function segHit(ax, ay, bx, by, cx, cy, dx, dy) {
 }
 
 /**
- * A brittle chocolate shell. Every press is its own little fracture event:
- * a few jagged cracks run out from the finger at a fixed length, wandering
- * and occasionally branching, and they stop dead when they run into an
- * existing crack, just like real fractures do. A short curved crack near the
- * centre cuts out small plates that get pushed into the soft ice cream.
- * Pressing the same spot again crushes it into a little hole and flicks out
- * chips. Nothing grows, nothing caps out, nothing cancels.
+ * A brittle chocolate shell. Every press shatters a patch around the finger
+ * into irregular, straight-edged plates (small near the finger, larger
+ * further out), all at once, like a snap. Edges stop where they meet older
+ * cracks, so the shell keeps breaking up finer. Plates that broke free are
+ * pushed into the soft ice cream by their own amounts; pressing one again
+ * pops it right out. Now and then a press makes one long, gently curving
+ * split instead. Nothing grows, nothing caps out, nothing cancels.
  */
 export class Fracture {
   constructor() {
@@ -93,24 +124,195 @@ export class Fracture {
     return best;
   }
 
+  /** A press on the shell at a hit point (object space). */
+  press(hit, now, M, world) {
+    const q = deformRef(hit.x, hit.y, hit.z, M.sag, M.bulge, M.taper, M.shrink);
+    const face = q.z >= 0 ? 0 : 1;
+    this.any = true;
+    this.ooze = Math.max(this.ooze, 0.22); // a press squeezes a little vanilla up
+    let type = "crack";
+    // pressing a broken plate again pops it out
+    const hitCell = this.cellAt(face, q.x, q.y);
+    if (hitCell && !hitCell.removed) {
+      this.popCell(hitCell, now);
+      this.spawnCrumbs(hit, 3 + Math.floor(rand(0, 3)), world, 0.12, 0.26);
+      type = "crunch";
+    } else {
+      const imp = { id: this.nextId++, x: q.x, y: q.y, face, hole: 0, born: now, low: q.y, cells: [] };
+      this.impacts.push(imp);
+      // a press inside an already broken area breaks smaller
+      const R = hitCell ? rand(0.7, 1.1) : rand(1.5, 2.5);
+      if (!hitCell && Math.random() < 0.16) this.curvedSplit(imp, now);
+      else this.shatter(imp, R, now);
+      this.spawnCrumbs(hit, 2 + Math.floor(rand(0, 3)), world, 0.04, 0.1);
+      if (hitCell) type = "crunch";
+    }
+    this.flush();
+    return { type };
+  }
+
+  /** Draw everything right away: a crack is a snap, not a growth. */
+  flush() {
+    if (!this.ops.length) return;
+    for (const op of this.ops) this.draw(op);
+    this.ops = [];
+    this.texDirty = true;
+  }
+
+  cellAt(face, x, y) {
+    for (let k = this.impacts.length - 1; k >= 0; k--) {
+      const imp = this.impacts[k];
+      if (imp.face !== face) continue;
+      for (const c of imp.cells) {
+        if (!c.closed) continue;
+        if (pointInPoly(x, y, c.poly)) return c;
+      }
+    }
+    return null;
+  }
+
   /**
-   * Walk one crack outwards. Cracks wander a little, kink now and then, and
-   * stop at other cracks or when they run off the face. Returns the polyline.
+   * Shatter a patch of shell around the press into irregular plates:
+   * a Voronoi pattern of random seeds, small plates under the finger and
+   * bigger ones further out. Edges are straight with a little jag, the outer
+   * cracks peter out instead of closing, and every edge stops where it meets
+   * an existing crack.
    */
-  growCrack(face, x, y, ang, length, impactId, pathId, t0, w0, wander = 0.12) {
+  shatter(imp, R, now) {
+    const { face, x, y, id } = imp;
+    const seeds = [[x, y]];
+    const n = 6 + Math.floor(rand(0, 6));
+    for (let i = 0; i < n; i++) {
+      const a = rand(0, Math.PI * 2);
+      const r = R * Math.pow(rand(0.12, 1), 0.75);
+      seeds.push([x + Math.cos(a) * r, y + Math.sin(a) * r]);
+    }
+    const B = R * 1.7;
+    const box = [[x - B, y - B], [x + B, y - B], [x + B, y + B], [x - B, y + B]];
+    const onBox = (p) => Math.abs(Math.abs(p[0] - x) - B) < 1e-6 || Math.abs(Math.abs(p[1] - y) - B) < 1e-6;
+    const drawn = new Map();
+    const edgeKey = (p, q2) => {
+      const k1 = `${p[0].toFixed(4)},${p[1].toFixed(4)}`;
+      const k2 = `${q2[0].toFixed(4)},${q2[1].toFixed(4)}`;
+      return k1 < k2 ? `${k1}|${k2}` : `${k2}|${k1}`;
+    };
+    const cells = seeds.map((sd, i) => {
+      let poly = box.map((p) => p.slice());
+      for (let j = 0; j < seeds.length && poly.length; j++) {
+        if (j !== i) poly = clipHalf(poly, sd, seeds[j]);
+      }
+      return { poly, seed: sd, closed: poly.length >= 3, removed: false, face, imp };
+    });
+    const newSegs = [];
+    for (const cell of cells) {
+      const P = cell.poly;
+      for (let e = 0; e < P.length; e++) {
+        const A = P[e];
+        const Bp = P[(e + 1) % P.length];
+        if (onBox(A) && onBox(Bp)) {
+          cell.closed = false;
+          continue;
+        }
+        const key = edgeKey(A, Bp);
+        if (drawn.has(key)) {
+          if (!drawn.get(key)) cell.closed = false;
+          continue;
+        }
+        // near the press every edge breaks; further out fewer do
+        const mx = (A[0] + Bp[0]) / 2;
+        const my = (A[1] + Bp[1]) / 2;
+        const d = Math.hypot(mx - x, my - y) / R;
+        const keep = d < 0.7 || Math.random() < 1 - (d - 0.7) / 0.5;
+        let ok = false;
+        if (keep) ok = this.crackEdge(face, A, Bp, x, y, R, id, newSegs);
+        drawn.set(key, ok);
+        if (!ok) cell.closed = false;
+      }
+    }
+    for (const sgm of newSegs) {
+      this.segs[face].push(sgm);
+      imp.low = Math.min(imp.low, sgm[1], sgm[3]);
+    }
+    // plates that are fully broken free get pushed in, each its own amount
+    for (const cell of cells) {
+      if (!cell.closed) continue;
+      const d = Math.hypot(cell.seed[0] - x, cell.seed[1] - y) / R;
+      const v = d < 0.35 ? rand(110, 230) : rand(30, 150);
+      this.ops.push({ t: now, kind: "plate", face, poly: cell.poly, v: Math.floor(v) });
+      imp.cells.push(cell);
+    }
+  }
+
+  /**
+   * One straight crack between two plate corners, with a slight jag. It is
+   * walked from the end nearer the press and stops if it hits an older crack.
+   * Returns false if nothing of it was drawn or it was cut short.
+   */
+  crackEdge(face, A, Bp, cx, cy, R, id, out) {
+    let a = A;
+    let b = Bp;
+    if (Math.hypot(b[0] - cx, b[1] - cy) < Math.hypot(a[0] - cx, a[1] - cy)) [a, b] = [b, a];
+    const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    if (len < 1e-4) return false;
+    const k = Math.max(1, Math.ceil(len / 0.14));
+    const nx = -(b[1] - a[1]) / len;
+    const ny = (b[0] - a[0]) / len;
+    const pts = [a];
+    for (let i = 1; i < k; i++) {
+      const t = i / k;
+      const j = rand(-0.025, 0.025);
+      pts.push([a[0] + (b[0] - a[0]) * t + nx * j, a[1] + (b[1] - a[1]) * t + ny * j]);
+    }
+    pts.push(b);
+    let whole = true;
+    let drewAny = false;
+    for (let i = 1; i < pts.length; i++) {
+      let [ax, ay] = pts[i - 1];
+      let [bx, by] = pts[i];
+      if (!this.onShell(ax, ay)) {
+        whole = false;
+        break;
+      }
+      const t = this.arrest(face, ax, ay, bx, by, -1, -1, false);
+      if (t >= 0) {
+        bx = ax + (bx - ax) * t;
+        by = ay + (by - ay) * t;
+        whole = false;
+      }
+      const d = Math.hypot((ax + bx) / 2 - cx, (ay + by) / 2 - cy) / R;
+      const w = 0.14 - 0.07 * Math.min(1, d);
+      out.push([ax, ay, bx, by, id, 0]);
+      this.ops.push({ t: 0, kind: "line", face, ax, ay, bx, by, w });
+      drewAny = true;
+      if (t >= 0) break;
+    }
+    return drewAny && whole;
+  }
+
+  /** The rare one: a single long, gently curving split with one side dropping. */
+  curvedSplit(imp, now) {
+    const { face, x, y, id } = imp;
+    const ang = rand(0, Math.PI);
+    const w = rand(0.09, 0.13);
+    const bend = rand(-0.035, 0.035);
+    const a = this.track(imp, this.growCurve(face, x, y, ang, rand(1.8, 4.0), id, 0, w, bend));
+    const b = this.track(imp, this.growCurve(face, x, y, ang + Math.PI, rand(1.8, 4.0), id, 1, w, -bend));
+    const whole = [...b.slice().reverse(), ...a.slice(1)];
+    this.dropSide(face, whole, Math.random() < 0.5 ? 1 : -1, rand(0.45, 0.8), rand(1.0, 1.6), now);
+  }
+
+  /** A smooth arc (constant bend, tiny jag) that stops at older cracks. */
+  growCurve(face, x, y, ang, length, impactId, pathId, w0, bend) {
     const pts = [[x, y]];
     let a = ang;
     let travelled = 0;
-    const drift = rand(-0.4, 0.4);
     while (travelled < length) {
-      a += rand(-wander, wander) + drift * 0.08;
-      if (Math.random() < 0.035) a += rand(-0.45, 0.45); // a sudden kink
+      a += bend + rand(-0.015, 0.015);
       const nx = x + Math.cos(a) * STEP;
       const ny = y + Math.sin(a) * STEP;
       if (!this.onShell(nx, ny)) break;
-      const t = this.arrest(face, x, y, nx, ny, impactId, pathId, travelled < 0.25);
+      const t = this.arrest(face, x, y, nx, ny, impactId, pathId, travelled < 0.2);
       if (t >= 0) {
-        // run right into the other crack and stop there
         pts.push([x + (nx - x) * t, y + (ny - y) * t]);
         break;
       }
@@ -119,63 +321,15 @@ export class Fracture {
       travelled += STEP;
       pts.push([x, y]);
     }
-    // register now (so later cracks stop at it); draw as it runs, tapering
     const n = pts.length;
     for (let i = 1; i < n; i++) {
       const [ax, ay] = pts[i - 1];
       const [bx, by] = pts[i];
       this.segs[face].push([ax, ay, bx, by, impactId, pathId]);
       const k = i / Math.max(n - 1, 1);
-      const w = w0 * (1 - 0.7 * k * k) + 0.012;
-      this.ops.push({ t: t0 + (STEP * i) / CRACK_SPEED, kind: "line", face, ax, ay, bx, by, w });
+      this.ops.push({ t: 0, kind: "line", face, ax, ay, bx, by, w: w0 * (1 - 0.6 * k * k) + 0.015 });
     }
     return pts;
-  }
-
-  /** A press on the shell at a hit point (object space). */
-  press(hit, now, M, world) {
-    const q = deformRef(hit.x, hit.y, hit.z, M.sag, M.bulge, M.taper, M.shrink);
-    const face = q.z >= 0 ? 0 : 1;
-    this.any = true;
-    this.ooze = Math.max(this.ooze, 0.22); // a press squeezes a little vanilla up
-    // pressing an existing break again crushes it
-    let near = null;
-    let bestD = 1e9;
-    for (const imp of this.impacts) {
-      if (imp.face !== face) continue;
-      const d = Math.hypot(imp.x - q.x, imp.y - q.y);
-      if (d < 0.42 && d < bestD) {
-        near = imp;
-        bestD = d;
-      }
-    }
-    if (near) {
-      this.crush(near, q, now);
-      this.spawnCrumbs(hit, 3 + Math.floor(rand(0, 3)), world, 0.08, 0.2);
-      return { type: "crunch" };
-    }
-    const imp = { id: this.nextId++, x: q.x, y: q.y, face, hole: 0, born: now, low: q.y };
-    this.impacts.push(imp);
-    const kind = this.fracture(imp, now);
-    if (kind === "flake") this.spawnCrumbs(hit, 3 + Math.floor(rand(0, 3)), world, 0.12, 0.3);
-    else this.spawnCrumbs(hit, 2 + Math.floor(rand(0, 3)), world, 0.04, 0.1);
-    return { type: kind === "split" || kind === "flake" ? "crunch" : "crack" };
-  }
-
-  /**
-   * The fracture pattern of one press. Each press picks its own kind of
-   * break, and every length, angle, width and drop is random, so no two
-   * presses ever look the same.
-   */
-  fracture(imp, now) {
-    const r = Math.random();
-    const kind = r < 0.32 ? "split" : r < 0.62 ? "star" : r < 0.85 ? "fork" : "flake";
-    imp.kind = kind;
-    if (kind === "split") this.split(imp, now);
-    else if (kind === "star") this.star(imp, now);
-    else if (kind === "fork") this.fork(imp, now);
-    else this.flake(imp, now);
-    return kind;
   }
 
   track(imp, pts) {
@@ -183,14 +337,22 @@ export class Fracture {
     return pts;
   }
 
+  /** A broken plate pops right out, showing the soft ice cream under it. */
+  popCell(cell, now) {
+    cell.removed = true;
+    this.ops.push({ t: now, kind: "hole", face: cell.face, poly: cell.poly });
+    const imp = cell.imp;
+    imp.hole = Math.max(imp.hole, 0.3);
+    imp.low = Math.min(imp.low, ...cell.poly.map((p) => p[1]));
+    this.ooze = Math.max(this.ooze, 0.4);
+  }
+
   /**
-   * One side of a crack drops into the ice cream: painted as a few strips
-   * running along the crack, deepest right at the crack, easing back to
-   * intact shell further away (the plate tilts on its far edge).
+   * One side of a crack drops into the ice cream (a smooth slope, deepest
+   * at the crack), see drawDrop.
    */
   dropSide(face, pts, side, depth, width, t0) {
     if (pts.length < 3) return;
-    // which way is "this side": the average normal of the whole crack
     const [sx, sy] = pts[0];
     const [ex, ey] = pts[pts.length - 1];
     let nx = -(ey - sy);
@@ -199,178 +361,6 @@ export class Fracture {
     nx = (nx / l) * side;
     ny = (ny / l) * side;
     this.ops.push({ t: t0, kind: "drop", face, pts, nx, ny, v: Math.floor(depth * 255), width });
-  }
-
-  /** A long crack straight across the face through the press. */
-  split(imp, now) {
-    const { face, x, y, id } = imp;
-    const ang = rand(0, Math.PI);
-    const w = rand(0.1, 0.15);
-    const a = this.track(imp, this.growCrack(face, x, y, ang, rand(1.6, 4.2), id, 0, now, w, 0.07));
-    const b = this.track(imp, this.growCrack(face, x, y, ang + Math.PI, rand(1.6, 4.2), id, 1, now, w, 0.07));
-    const whole = [...b.slice().reverse(), ...a.slice(1)];
-    const tEnd = now + (Math.max(a.length, b.length) * STEP) / CRACK_SPEED;
-    const sideA = Math.random() < 0.5 ? 1 : -1;
-    this.dropSide(face, whole, sideA, rand(0.45, 0.85), rand(0.9, 1.6), tEnd);
-    // sometimes the other side gives a little too
-    if (Math.random() < 0.4) this.dropSide(face, whole, -sideA, rand(0.12, 0.3), rand(0.6, 1.0), tEnd);
-    // a couple of short side cracks feathering off the main one
-    const n = Math.floor(rand(0, 2.6));
-    for (let i = 0; i < n; i++) {
-      const src = Math.random() < 0.5 ? a : b;
-      if (src.length < 8) continue;
-      const j = 4 + Math.floor(rand(0, src.length - 6));
-      const [sx, sy] = src[j];
-      const t0 = now + (STEP * j) / CRACK_SPEED;
-      const base = Math.atan2(src[j + 1][1] - sy, src[j + 1][0] - sx);
-      this.track(imp, this.growCrack(face, sx, sy, base + (Math.random() < 0.5 ? -1 : 1) * rand(0.5, 1.1), rand(0.3, 1.0), id, 10 + i, t0, w * 0.5, 0.1));
-    }
-  }
-
-  /** Several long cracks bursting out, with sunken plates in the middle. */
-  star(imp, now) {
-    const { face, x, y, id } = imp;
-    const k = 3 + Math.floor(rand(0, 4));
-    const base = rand(0, Math.PI * 2);
-    const rays = [];
-    for (let i = 0; i < k; i++) {
-      const ang = base + (i / k) * Math.PI * 2 + rand(-0.45, 0.45);
-      const w = rand(0.075, 0.12);
-      const pts = this.track(imp, this.growCrack(face, x, y, ang, rand(0.9, 2.6), id, i, now, w, 0.1));
-      rays.push({ ang, pts });
-      if (pts.length > 8 && Math.random() < 0.3) {
-        const j = 4 + Math.floor(rand(0, pts.length - 6));
-        const [bx, by] = pts[j];
-        const t0 = now + (STEP * j) / CRACK_SPEED;
-        this.track(imp, this.growCrack(face, bx, by, ang + (Math.random() < 0.5 ? -1 : 1) * rand(0.4, 0.9), rand(0.3, 1.1), id, 100 + i, t0, w * 0.55, 0.1));
-      }
-    }
-    const norm = (a) => ((a % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
-    rays.sort((p, q) => norm(p.ang) - norm(q.ang));
-    const rho = rand(0.35, 0.7);
-    // only one or two short ring cracks: a full ring looks like a symbol
-    let arcs = 0;
-    const maxArcs = Math.random() < 0.5 ? 1 : 2;
-    const start = Math.floor(rand(0, rays.length));
-    for (let jj = 0; jj < rays.length && arcs < maxArcs; jj++) {
-      const i = (start + jj) % rays.length;
-      const A = rays[i];
-      const B = rays[(i + 1) % rays.length];
-      const reach = (ray) => (ray.pts.length - 1) * STEP > rho + 0.05;
-      if (!reach(A) || !reach(B) || Math.random() > 0.65) continue;
-      arcs++;
-      const a0 = norm(A.ang);
-      let a1 = norm(B.ang);
-      while (a1 <= a0) a1 += Math.PI * 2;
-      if (a1 - a0 > 2.6) continue;
-      const pts = [];
-      const N = 10;
-      const ph = rand(0, 6.28);
-      for (let s = 0; s <= N; s++) {
-        const aa = a0 + ((a1 - a0) * s) / N;
-        const rr = rho * (1 + 0.14 * Math.sin(aa * 2.3 + ph) + rand(-0.025, 0.025));
-        pts.push([x + Math.cos(aa) * rr, y + Math.sin(aa) * rr]);
-      }
-      const t0 = now + rho / CRACK_SPEED + 0.02;
-      const w = rand(0.055, 0.085);
-      for (let s = 1; s < pts.length; s++) {
-        const [ax, ay] = pts[s - 1];
-        const [bx, by] = pts[s];
-        this.segs[face].push([ax, ay, bx, by, id, 200 + i]);
-        this.ops.push({ t: t0 + s * 0.004, kind: "line", face, ax, ay, bx, by, w });
-      }
-      // the enclosed plate is pushed in as one piece, by its own amount
-      this.ops.push({ t: t0 + 0.03, kind: "plate", face, poly: [[x, y], ...pts], v: Math.floor(rand(90, 230)) });
-    }
-  }
-
-  /** One long crack that splits into two or three as it runs. */
-  fork(imp, now) {
-    const { face, x, y, id } = imp;
-    const ang = rand(0, Math.PI * 2);
-    const w = rand(0.1, 0.14);
-    // the trunk runs both ways from the finger
-    const back = this.track(imp, this.growCrack(face, x, y, ang + Math.PI, rand(0.4, 1.2), id, 0, now, w * 0.8, 0.08));
-    const trunk = this.track(imp, this.growCrack(face, x, y, ang, rand(0.7, 1.5), id, 1, now, w, 0.07));
-    if (trunk.length < 3) return;
-    const [fx, fy] = trunk[trunk.length - 1];
-    const [px, py] = trunk[trunk.length - 2];
-    const dir = Math.atan2(fy - py, fx - px);
-    const t0 = now + (trunk.length * STEP) / CRACK_SPEED;
-    const n = Math.random() < 0.6 ? 2 : 3;
-    const spread = rand(0.5, 1.0);
-    const arms = [];
-    for (let i = 0; i < n; i++) {
-      const off = n === 2 ? (i === 0 ? -spread : spread) : (i - 1) * spread;
-      arms.push(this.track(imp, this.growCrack(face, fx, fy, dir + off + rand(-0.15, 0.15), rand(0.9, 2.4), id, 2 + i, t0, w * 0.75, 0.1)));
-    }
-    // the wedge between the first two arms drops in
-    const A = arms[0];
-    const B = arms[arms.length - 1];
-    if (A.length > 4 && B.length > 4) {
-      const m = Math.min(A.length, B.length, 12);
-      const poly = [[fx, fy], ...A.slice(1, m), ...B.slice(1, m).reverse()];
-      this.ops.push({ t: t0 + (m * STEP) / CRACK_SPEED, kind: "plate", face, poly, v: Math.floor(rand(80, 200)) });
-    }
-    this.dropSide(face, [...back.slice().reverse(), ...trunk.slice(1)], Math.random() < 0.5 ? 1 : -1, rand(0.3, 0.6), rand(0.6, 1.1), t0);
-  }
-
-  /** A chunk of shell pops right out, with cracks running from the gap. */
-  flake(imp, now) {
-    const { face, x, y, id } = imp;
-    const rr = rand(0.35, 0.7);
-    const poly = [];
-    const N = 9 + Math.floor(rand(0, 5));
-    const rot = rand(0, Math.PI * 2);
-    const stretch = rand(0.6, 1.0);
-    for (let i = 0; i < N; i++) {
-      const a = (i / N) * Math.PI * 2;
-      const r0 = rr * rand(0.65, 1.25);
-      const lx = Math.cos(a) * r0;
-      const ly = Math.sin(a) * r0 * stretch;
-      poly.push([x + lx * Math.cos(rot) - ly * Math.sin(rot), y + lx * Math.sin(rot) + ly * Math.cos(rot)]);
-    }
-    this.ops.push({ t: now + 0.02, kind: "hole", face, poly });
-    imp.hole = rr;
-    imp.chips = true;
-    for (let i = 0; i < poly.length; i++) {
-      const [ax, ay] = poly[i];
-      const [bx, by] = poly[(i + 1) % poly.length];
-      this.segs[face].push([ax, ay, bx, by, id, 50]);
-    }
-    const n = 2 + Math.floor(rand(0, 3));
-    for (let i = 0; i < n; i++) {
-      const [sx, sy] = poly[Math.floor(rand(0, poly.length))];
-      const a = Math.atan2(sy - y, sx - x) + rand(-0.4, 0.4);
-      this.track(imp, this.growCrack(face, sx, sy, a, rand(0.5, 1.8), id, 60 + i, now + 0.03, rand(0.07, 0.11), 0.1));
-    }
-  }
-
-  /** Pressing the same spot again: crush it into a small hole. */
-  crush(imp, q, now) {
-    const { face, id } = imp;
-    const grow = imp.hole < 0.42;
-    if (grow) imp.hole = Math.min(0.42, imp.hole + rand(0.1, 0.15));
-    const r = imp.hole;
-    const poly = [];
-    const N = 14;
-    for (let i = 0; i < N; i++) {
-      const a = (i / N) * Math.PI * 2;
-      const rr = r * rand(0.7, 1.2);
-      poly.push([imp.x + Math.cos(a) * rr, imp.y + Math.sin(a) * rr]);
-    }
-    this.ops.push({ t: now, kind: "hole", face, poly });
-    this.ops.push({ t: now, kind: "dimple", face, x: imp.x, y: imp.y, r: r + 0.3, v: 45 });
-    // crushing sends a few more short cracks out from the rim; they stop at
-    // the existing ones, so the shell around just breaks up finer
-    const n = grow ? 2 + Math.floor(rand(0, 2)) : 2;
-    for (let i = 0; i < n; i++) {
-      const a = rand(0, Math.PI * 2);
-      const sx = q.x + Math.cos(a) * (r * 0.9);
-      const sy = q.y + Math.sin(a) * (r * 0.9);
-      this.growCrack(face, sx, sy, a + rand(-0.3, 0.3), rand(0.25, 0.6), id, 300 + this.nextId++, now, 0.028);
-    }
-    this.ooze = Math.max(this.ooze, 0.4);
   }
 
   spawnCrumbs(hit, count, world, s0, s1) {
@@ -426,16 +416,6 @@ export class Fracture {
       g.fillStyle = `rgb(0,0,${op.v})`;
       this.path(op.face, op.poly);
       g.fill();
-    } else if (op.kind === "dimple") {
-      const [cx, cy] = this.px(op.face, op.x, op.y);
-      const R = op.r * PX;
-      const gr = g.createRadialGradient(cx, cy, 0, cx, cy, R);
-      gr.addColorStop(0, `rgb(0,40,${op.v})`);
-      gr.addColorStop(1, "rgb(0,0,0)");
-      g.fillStyle = gr;
-      g.fillRect(cx - R, cy - R, R * 2, R * 2);
-    } else if (op.kind === "drop") {
-      this.drawDrop(op);
     } else if (op.kind === "hole") {
       g.fillStyle = "rgb(255,120,40)";
       this.path(op.face, op.poly);
