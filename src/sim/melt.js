@@ -35,11 +35,16 @@ export const TEMP_MIN = -18;
 export const TEMP_MAX = 45;
 export const TEMP_DEFAULT = 29;
 
+// Evenly spread: each degree above the default adds the same amount of speed
+// (1x at 29 deg up to 8x at 45 deg, so 38 -> 45 is a step, not a cliff);
+// below the default it eases down to a standstill at freezing.
+export const RATE_MAX = 8;
+
 export function rateForTemp(t) {
   if (t <= -4) return 0;
-  const r = Math.pow(2, (t - TEMP_DEFAULT) / 4);
-  // fade in smoothly just above freezing
-  return r * smoothstep(-4, 6, t);
+  if (t >= TEMP_DEFAULT) return 1 + ((RATE_MAX - 1) * (t - TEMP_DEFAULT)) / (TEMP_MAX - TEMP_DEFAULT);
+  const k = (t + 4) / (TEMP_DEFAULT + 4);
+  return k * k;
 }
 
 export function describeTemp(t) {
