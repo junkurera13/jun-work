@@ -99,10 +99,23 @@ float bodyOuter(vec3 p, out vec3 q, out float hn) {
 // texture over the shell (reference space; front face left, back face right):
 // R = crack/hole mask, G = halo where squeezed vanilla may show, B = push-in.
 // Returns the groove field (negative inside a crack or hole).
+// Chart that wraps all the way around the bar (mirrors toChart in shape.js).
+float crackU(vec3 q) {
+  float y = q.y;
+  float a = mix(2.98, 2.58, smoothstep(-3.2, 5.6, y));
+  float n = mix(3.2, 2.62, smoothstep(-4.8, 5.6, y));
+  float sy = min(abs(y - BAR_MID) / 5.2, 0.999);
+  float W = max(a * pow(1.0 - pow(sy, n), 1.0 / n), 0.05);
+  float T = max(1.85 * pow(1.0 - pow(sy, 2.6), 1.0 / 2.6), 0.05);
+  float R = 0.5 * (W + T);
+  float e = (W - T) / (W + T);
+  float phi = atan(q.x / W, q.z / T);
+  return R * (phi - 0.5 * e * sin(2.0 * phi));
+}
+
 float crackField(vec3 q, out float sink, out float fill, out float inHole, out float holeEdge,
                  out float recess, out float gapAO) {
-  float face = q.z >= 0.0 ? 0.0 : 1.0;
-  vec2 uv = vec2(((q.x + 3.2) / 6.4 + face) * 0.5, (6.1 - q.y) / 11.52);
+  vec2 uv = vec2((crackU(q) + 8.96) / 17.92, (6.1 - q.y) / 11.52);
   vec4 t = textureLod(uCrackTex, uv, 0.0);
   // blurred copies of the crack mask (mip levels): how much crack is nearby
   float near = textureLod(uCrackTex, uv, 2.0).r;
@@ -116,7 +129,8 @@ float crackField(vec3 q, out float sink, out float fill, out float inHole, out f
   recess = 0.09 * smoothstep(0.03, 0.45, wide) * heal;
   // narrow, deep gaps are shadowed inside; wide openings stay bright
   gapAO = mix(0.72, 1.0, smoothstep(0.12, 0.6, near));
-  fill = uOoze * heal;
+  // only right next to an actual crack
+  fill = uOoze * heal * smoothstep(0.02, 0.25, near);
   inHole = step(0.6, t.g) * step(0.9, t.r);
   holeEdge = inHole > 0.5 ? -0.2 : 1e5;
   // R crosses 0.5 at the crack edge; ~1 texel (0.01 cm) per 0.5 of mask
@@ -151,7 +165,8 @@ void bodyEval(vec3 p, inout Parts P) {
       // softened vanilla creeps up *inside* the cracks, a little more as it
       // melts, until it forms a thin glossy bead along the crack line
       float level = dO + sink + (tcE + recess) * (1.0 - fill) - 0.018 * fill * fill;
-      float dFill = max(level, vd - 0.012 * fill);
+      // vd is only +0.01 away from cracks, so the spread must stay below that
+      float dFill = max(level, vd - 0.006 * fill);
       dCore = smin(dCore, dFill, 0.02);
     }
   }

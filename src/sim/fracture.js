@@ -1,18 +1,17 @@
-import { deformRef, sdBar } from "./shape.js";
+import { crossSection, deformRef, fromChart, toChart } from "./shape.js";
 import { mulMat3, quatIntegrate, rand } from "./math.js";
 
-// Cracks live in a texture over the shell, in the bar's reference space,
-// front face on the left half and back face on the right half:
+// Cracks live in a texture that wraps all the way around the shell like a
+// label (see toChart in shape.js: u around the bar, y up it), so they run
+// over the rounded sides and onto the back without a seam:
 //   R  crack / crushed-hole mask (the shell is missing where R > 0.5)
 //   G  soft halo around cracks: where squeezed-out vanilla can show
 //   B  how far that bit of shell has been pushed into the ice cream
-export const CRACK_W = 1280;
+export const CRACK_W = 1792;
 export const CRACK_H = 1152;
-const FACE_W = CRACK_W / 2;
-const X0 = -3.2;
-const X1 = 3.2;
+const PX = 100; // texels per cm
+const U_HALF = CRACK_W / PX / 2; // u runs -8.96 .. 8.96 cm
 const Y1 = 6.1; // top of the mapped area (bottom is Y1 - CRACK_H / PX = -5.42)
-const PX = FACE_W / (X1 - X0); // texels per cm (100)
 const GRAVITY = 900; // cm/s^2
 const STEP = 0.055;
 
@@ -97,12 +96,14 @@ export class Fracture {
     this.nextId = 1;
   }
 
-  px(face, x, y) {
-    return [(x - X0) * PX + face * FACE_W, (Y1 - y) * PX];
+  px(face, u, y) {
+    return [(u + U_HALF) * PX, (Y1 - y) * PX];
   }
 
-  onShell(x, y) {
-    return sdBar(x, y, 0) < -0.08;
+  /** Is chart point (u, y) on the shell? Stops short of the back seam and the very ends. */
+  onShell(u, y) {
+    const c = crossSection(y);
+    return c.W > 0.45 && Math.abs(u) < Math.PI * c.R - 0.04;
   }
 
   /** Does a step a->b run into an existing crack? Returns t in [0,1] or -1. */
@@ -127,7 +128,9 @@ export class Fracture {
   /** A press on the shell at a hit point (object space). */
   press(hit, now, M, world) {
     const q = deformRef(hit.x, hit.y, hit.z, M.sag, M.bulge, M.taper, M.shrink);
-    const face = q.z >= 0 ? 0 : 1;
+    const face = 0; // one chart all the way round
+    const ch = toChart(q.x, q.y, q.z);
+    q.x = ch.u;
     this.any = true;
     this.ooze = Math.max(this.ooze, 0.22); // a press squeezes a little vanilla up
     let type = "crack";
@@ -520,14 +523,11 @@ export class Fracture {
   /** Where vanilla is escaping through the shell (used to spawn drips). */
   leakSources() {
     if (this.ooze < 0.5) return [];
-    const out = this.impacts.map((imp) => ({
-      id: `i${imp.id}`,
-      x: imp.x + Math.sin(imp.id * 7.3) * 0.12,
-      y: imp.hole > 0.15 ? imp.y - imp.hole * 0.9 : Math.max(imp.low, imp.y - 1.0),
-      side: imp.face === 0 ? 1 : -1,
-      hole: imp.hole > 0.15,
-      fill: this.ooze,
-    }));
+    const out = this.impacts.map((imp) => {
+      const y = imp.hole > 0.15 ? imp.y - imp.hole * 0.9 : Math.max(imp.low, imp.y - 1.0);
+      const r = fromChart(imp.x, y);
+      return { id: `i${imp.id}`, x: r.x + Math.sin(imp.id * 7.3) * 0.12, y, side: r.side, hole: imp.hole > 0.15, fill: this.ooze };
+    });
     out.sort((a, b) => a.y - b.y);
     return out.slice(0, 5);
   }

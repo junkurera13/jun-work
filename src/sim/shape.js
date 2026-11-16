@@ -181,3 +181,39 @@ export function sdStick(x, y, z) {
   const wy = Math.abs(z) - STICK_HT + re;
   return Math.min(Math.max(wx, wy), 0) + Math.hypot(Math.max(wx, 0), Math.max(wy, 0)) - re;
 }
+
+// ---------------------------------------------------------------- chart ----
+// Cracks are drawn on a 2D chart that wraps all the way around the bar like
+// a label: u runs around the cross-section (cm, 0 at the front centre, +/-
+// pi*R at the back centre), v is simply the height y. Mirrors crackChart() in
+// scene.frag.glsl.
+
+/** Cross-section of the undeformed bar at height y: half width W, half thickness T. */
+export function crossSection(y) {
+  const a = mix(2.98, 2.58, smoothstep(-3.2, 5.6, y));
+  const n = mix(3.2, 2.62, smoothstep(-4.8, 5.6, y));
+  const sy = Math.min(Math.abs(y - BAR_MID) / 5.2, 0.999);
+  const W = Math.max(a * Math.pow(1 - Math.pow(sy, n), 1 / n), 0.05);
+  const T = Math.max(1.85 * Math.pow(1 - Math.pow(sy, 2.6), 1 / 2.6), 0.05);
+  return { W, T, R: 0.5 * (W + T), e: (W - T) / (W + T) };
+}
+
+/** Reference-space point -> chart (u, y). */
+export function toChart(x, y, z) {
+  const c = crossSection(y);
+  const phi = Math.atan2(x / c.W, z / c.T);
+  return { u: c.R * (phi - 0.5 * c.e * Math.sin(2 * phi)), y, R: c.R };
+}
+
+/** Chart (u, y) -> reference-space surface direction (x on the surface, side +1 front / -1 back). */
+export function fromChart(u, y) {
+  const c = crossSection(y);
+  let phi = u / c.R;
+  for (let i = 0; i < 4; i++) {
+    const f = c.R * (phi - 0.5 * c.e * Math.sin(2 * phi)) - u;
+    const df = c.R * (1 - c.e * Math.cos(2 * phi));
+    phi -= f / df;
+  }
+  return { x: c.W * Math.sin(phi), z: c.T * Math.cos(phi), side: Math.cos(phi) >= 0 ? 1 : -1 };
+}
+
