@@ -1,6 +1,5 @@
 import fragSrc from "../shaders/scene.frag.glsl?raw";
 import commonSrc from "../shaders/common.glsl?raw";
-import { CELL_TEX_H, CELL_TEX_W } from "../sim/fracture.js";
 
 const VERT = `#version 300 es
 layout(location = 0) in vec2 aPos;
@@ -50,7 +49,7 @@ export class Renderer {
     gl.enableVertexAttribArray(0);
     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
 
-    this.cellTex = this.floatTex(CELL_TEX_W, CELL_TEX_H);
+    this.crackTex = this.byteTex();
     this.dynTex = this.floatTex(DYN_W, DYN_H);
     this.dyn = new Float32Array(DYN_W * DYN_H * 4);
 
@@ -90,7 +89,7 @@ export class Renderer {
       const name = info.name.replace(/\[0\]$/, "");
       this.u[name] = gl.getUniformLocation(this.prog, info.name);
     }
-    gl.uniform1i(this.u.uCellTex, 0);
+    gl.uniform1i(this.u.uCrackTex, 0);
     gl.uniform1i(this.u.uDyn, 1);
     gl.uniform1i(this.u.uTextTex, 2);
   }
@@ -122,11 +121,26 @@ export class Renderer {
     this.textTex = t;
   }
 
-  uploadCells(data) {
+  byteTex() {
+    const gl = this.gl;
+    const t = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, t);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(4));
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    return t;
+  }
+
+  /** The crack canvas (see sim/fracture.js) -> texture. */
+  uploadCracks(canvas) {
     const gl = this.gl;
     gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, this.cellTex);
-    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, CELL_TEX_W, CELL_TEX_H, gl.RGBA, gl.FLOAT, data);
+    gl.bindTexture(gl.TEXTURE_2D, this.crackTex);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvas);
   }
 
   uploadDyn() {
@@ -198,7 +212,8 @@ export class Renderer {
     gl.uniform1f(u.uChocGone, M.chocGone);
     gl.uniform1f(u.uStickK, M.stickK);
     gl.uniform1f(u.uWet, M.wet);
-    gl.uniform1i(u.uImpactCount, U.impacts);
+    gl.uniform1f(u.uCracks, U.cracks ? 1 : 0);
+    gl.uniform1f(u.uOoze, U.ooze);
     gl.uniform1i(u.uPrimCount, U.primCount);
     gl.uniform1i(u.uCrumbCount, U.crumbCount);
     gl.uniform3fv(u.uLiqMin, U.liqMin);
@@ -206,7 +221,7 @@ export class Renderer {
     gl.uniform1f(u.uExposure, U.exposure);
 
     gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, this.cellTex);
+    gl.bindTexture(gl.TEXTURE_2D, this.crackTex);
     gl.activeTexture(gl.TEXTURE1);
     gl.bindTexture(gl.TEXTURE_2D, this.dynTex);
     gl.activeTexture(gl.TEXTURE2);

@@ -2,9 +2,10 @@
 
 A blank white page with one Magic Choc vanilla ice cream on it.
 
-- **Tap / click** the chocolate shell to crack it where you press: it dents, cracks run out from
-  your finger and vanilla squeezes up through them. **Hold** to keep pressing deeper. Press the
-  same spot again to crush it, and small chips flick out.
+- **Tap / click** the chocolate shell to break it. Every press is its own fracture: a long split
+  across the bar, a star of cracks with plates pushed in, a forking crack, or a chunk popping out.
+  New cracks stop where they meet old ones, so the shell breaks up more and more. Press the same
+  spot again to crush it.
 - **Drag** to turn it around.
 - It **melts** slowly by itself: the vanilla goes first, leaking from the bottom (and
   welling up through any cracks), then the chocolate softens. Drips run down the
@@ -41,7 +42,7 @@ npm run build
 | `src/shaders/common.glsl` | Shared SDF / noise helpers (the bar shape lives here) |
 | `src/sim/shape.js` | JS mirror of the SDF, used for picking and to keep drips on the surface |
 | `src/sim/melt.js` | Melt timeline, plus the temperature → speed mapping |
-| `src/sim/fracture.js` | Presses: craters, crack growth, crushing, flying chips |
+| `src/sim/fracture.js` | Crack paths (painted into a texture the shader reads), crushing, flying chips |
 | `src/sim/liquid.js` | Rivulets, hanging drops, pinch-off and falling drops |
 | `src/audio/crack.js` | Procedural chocolate-snap sounds |
 | `src/ui/dial.js` | Temperature dial |

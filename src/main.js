@@ -195,8 +195,6 @@ function onDown(e) {
     const res = fracture.press(hit, state.time, hit.M, world);
     if (res) {
       const pan = (e.clientX / window.innerWidth) * 2 - 1;
-      pointer.press = res.impact;
-      pointer.pan = pan;
       pointer.slop = 14; // a finger wobbles; don't start turning the bar too eagerly
       audio.crack(res.type === "crunch" ? "pop" : "crack", pan, res.type === "crunch" ? 1 : 0.85);
       state.shake = res.type === "crunch" ? 0.9 : 0.6;
@@ -215,7 +213,6 @@ function onMove(e) {
     pointer.y = e.clientY;
     if (Math.hypot(e.clientX - pointer.sx, e.clientY - pointer.sy) > (pointer.slop || 4)) {
       pointer.moved = true;
-      pointer.press = null;
     }
     if (pointer.moved) {
       state.yaw += dx * 0.0085;
@@ -275,7 +272,7 @@ function newIceCream() {
   liquid.reset();
   canvas.classList.remove("has-cracked");
   resetBtn.classList.remove("is-visible");
-  if (renderer) renderer.uploadCells(fracture.data);
+  if (renderer) renderer.uploadCracks(fracture.canvas);
 }
 
 resetBtn.addEventListener("click", () => {
@@ -367,15 +364,9 @@ function frame(now) {
 
   if (!renderer || !renderer.u) return;
 
-  // holding a press pushes deeper, with a crackle as the cracks creep
-  if (pointer && pointer.press && fracture.hold(pointer.press, dt)) {
-    audio.crackle(pointer.pan, pointer.press.strength);
-    state.shake = Math.max(state.shake, 0.25);
-    if (navigator.vibrate) navigator.vibrate(4);
-  }
   fracture.update(dt, state.time, rate, M, world, cam.floorY);
   if (fracture.texDirty) {
-    renderer.uploadCells(fracture.data);
+    renderer.uploadCracks(fracture.canvas);
     fracture.texDirty = false;
   }
   liquid.update(dt, state.time, rate, M, fracture.leakSources(), world, cam.floorY);
@@ -410,7 +401,8 @@ function frame(now) {
       boundMin: b.min,
       boundMax: b.max,
       melt: M,
-      impacts: fracture.impacts.length,
+      cracks: fracture.any,
+      ooze: fracture.ooze,
       primCount: liq.count,
       crumbCount: fr.crumbs,
       liqMin: liq.count ? liq.min : [0, 0, 0],
@@ -439,7 +431,7 @@ if (renderer) {
   renderer
     .ready()
     .then(() => {
-      renderer.uploadCells(fracture.data);
+      renderer.uploadCracks(fracture.canvas);
       document.body.classList.add("is-ready");
       state.appear = 0;
       last = performance.now();

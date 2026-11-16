@@ -29,8 +29,9 @@ uniform float uStickK;
 uniform float uWet;
 
 // fracture
-uniform int uImpactCount;
-uniform sampler2D uCellTex;
+uniform float uCracks;
+uniform float uOoze;
+uniform sampler2D uCrackTex;
 
 // dynamic objects
 uniform sampler2D uDyn;
@@ -47,7 +48,6 @@ uniform float uExposure;
 const float TEXT_Y0 = -4.3;
 const float TEXT_Y1 = -0.15;
 const int MAX_PRIMS = 64;
-const int MAX_IMPACTS = 16;
 const int MAX_CRUMBS = 24;
 
 struct Parts {
@@ -94,111 +94,21 @@ float bodyOuter(vec3 p, out vec3 q, out float hn) {
   return d / uSag * (1.0 - 0.95 * uTaper) * (1.0 - uShrink);
 }
 
-float wrapAngle(float a) {
-  return a - 6.2831853 * floor((a + 3.14159265) / 6.2831853);
-}
-
-// Impact cracks. Every press leaves: a shallow crater, a handful of jagged
-// cracks radiating from the press point (tapering as they run out), partial
-// ring cracks around it, the plates in between pushed into the soft ice cream
-// at slightly different angles, vanilla squeezed up through the gaps and,
-// after hard presses, a crushed hole in the middle.
+// Cracks, crushed holes and pushed-in plates are painted by the CPU into a
+// texture over the shell (reference space; front face left, back face right):
+// R = crack/hole mask, G = halo where squeezed vanilla may show, B = push-in.
 // Returns the groove field (negative inside a crack or hole).
 float crackField(vec3 q, out float sink, out float fill, out float inHole, out float holeEdge) {
-  sink = 0.0;
-  fill = 0.0;
-  inHole = 0.0;
-  holeEdge = 1e5;
-  float vd = 1e5;
+  float face = q.z >= 0.0 ? 0.0 : 1.0;
+  vec2 uv = vec2(((q.x + 3.2) / 6.4 + face) * 0.5, (6.1 - q.y) / 11.52);
+  vec4 t = texture(uCrackTex, uv);
   float heal = 1.0 - smoothstep(0.45, 0.85, uMeltC);
-  float jag = vnoise2(q.xy * 14.0);
-  float jag2 = vnoise2(q.xy * 37.0 + 5.0);
-  for (int i = 0; i < MAX_IMPACTS; i++) {
-    if (i >= uImpactCount) break;
-    vec4 A = texelFetch(uCellTex, ivec2(i, 0), 0);  // x, y, face, radius
-    float R = A.w;
-    if (R < 0.01) continue;
-    if (q.z * A.z < -0.3) continue;                 // other face of the bar
-    vec2 dv = q.xy - A.xy;
-    float r = length(dv);
-    if (r > R * 1.08) continue;
-    vec4 B = texelFetch(uCellTex, ivec2(i, 1), 0);  // depth, seed, hole, fill
-    vec4 C = texelFetch(uCellTex, ivec2(i, 2), 0);  // strength
-    float seed = B.y;
-    float th = atan(dv.y, dv.x);
-    // cracks wander as they run outwards
-    float thw = th + 0.32 * (vnoise2(vec2(r * 3.0 + seed * 3.0, seed * 9.0)) - 0.5)
-                   + 0.1 * (vnoise2(vec2(r * 9.0 + seed, seed * 2.0)) - 0.5) + 0.04 * (jag - 0.5);
-    float K = floor(5.0 + hash12(vec2(seed * 3.7, 1.3)) * 3.0);
-    float sw = 6.2831853 / K;
-    float sIdx = floor((thw + 3.14159265) / sw);
-    float best = 1e5;
-    float plate = 0.0;
-    float bestSigned = 1.0;
-    for (int k = -1; k <= 1; k++) {
-      float s = sIdx + float(k);
-      float sm = mod(s, K);
-      float h1 = hash12(vec2(sm * 1.7 + 0.3, seed * 13.1));
-      float h2 = hash12(vec2(sm * 2.3 + 7.0, seed * 5.3));
-      float ang = (s + 0.5 + (h1 - 0.5) * 0.75) * sw - 3.14159265;
-      float L = R * (0.45 + 0.55 * h2);
-      float da = wrapAngle(thw - ang);
-      float ada = min(abs(da), 1.5707);
-      float lat = r * sin(ada);
-      float along = r * cos(ada);
-      float dist = along < L ? lat : length(vec2(along - L, lat));
-      float w = 0.024 * pow(clamp(1.0 - r / L, 0.0, 1.0), 0.65) * min(1.0, C.x * 1.6);
-      float g = dist - w * (0.45 + 1.1 * jag) - 0.004 * jag2;
-      if (g < best) {
-        best = g;
-        bestSigned = da;
-        plate = mod(da > 0.0 ? sm : sm - 1.0, K);
-      }
-    }
-    // partial, wobbly ring cracks join neighbouring spokes into plates
-    float zone = 0.0;      // which ring band of this plate we are in (only real cracks count)
-    float zoneR0 = 0.0;    // inner radius of that band
-    float rings = 0.0;
-    vec2 cs = vec2(cos(th), sin(th));
-    for (int j = 0; j < 2; j++) {
-      float fj = float(j);
-      float rho = R * (fj < 0.5 ? 0.3 + 0.1 * hash12(vec2(seed, 3.0)) : 0.6 + 0.12 * hash12(vec2(seed, 4.0)));
-      rho *= 1.0 + 0.42 * (vnoise2(cs * 1.9 + vec2(seed * 3.1, fj * 7.0)) - 0.5) + 0.1 * (vnoise2(cs * 6.0 + seed) - 0.5);
-      bool present = hash12(vec2(plate * 3.1 + fj * 17.0, seed * 7.7)) < (fj < 0.5 ? 0.7 : 0.45)
-                     && C.x > 0.3 + 0.3 * fj;
-      if (!present) continue;
-      rings += 1.0;
-      if (r > rho) { zone += 1.0; zoneR0 = rho; }
-      float w = 0.017 * (1.0 - rho / R) * min(1.0, C.x);
-      float g = abs(r - rho) - w * (0.4 + 1.2 * jag) - 0.004 * jag2;
-      best = min(best, g);
-    }
-    // each broken plate is pushed into the soft ice cream as a whole,
-    // hinged at its outer end, by its own amount: steps appear at the cracks
-    float pf = 0.6 + 0.8 * hash12(vec2(plate * 5.3 + zone * 1.9, seed * 2.9));
-    // plates fully enclosed by cracks drop in as a block (a step at every
-    // crack); the open outer band only tilts, easing back to intact shell
-    float sk;
-    if (rings > zone + 0.5) {
-      sk = B.x * pf * (1.0 - 0.35 * r / R);
-    } else {
-      sk = B.x * pf * (zone < 0.5 ? 0.8 : 0.5) * (1.0 - smoothstep(zoneR0, zoneR0 + 0.45 * R, r));
-    }
-    sk *= heal;
-    sink = max(sink, sk);
-    // vanilla squeezed up through the gaps, strongest near the press
-    fill = max(fill, B.w * (1.0 - 0.75 * smoothstep(0.2 * R, R, r)) * heal);
-    vd = min(vd, best + (1.0 - heal) * 0.05);
-    // crushed centre
-    float hr = B.z * (0.7 + 0.6 * vnoise2(cs * 2.0 + seed * 4.0));
-    if (hr > 0.0) {
-      float he = hr - r;
-      holeEdge = min(holeEdge, -he);
-      if (he > 0.0) inHole = 1.0;
-      vd = min(vd, -he + 0.01 * jag);
-    }
-  }
-  return vd;
+  sink = t.b * 0.075 * heal;
+  fill = uOoze * smoothstep(0.04, 0.45, t.g) * heal;
+  inHole = step(0.6, t.g) * step(0.9, t.r);
+  holeEdge = inHole > 0.5 ? -0.2 : 1e5;
+  // R crosses 0.5 at the crack edge; ~1 texel (0.01 cm) per 0.5 of mask
+  return (0.5 - t.r * heal) * 0.02;
 }
 
 void bodyEval(vec3 p, inout Parts P) {
@@ -211,7 +121,7 @@ void bodyEval(vec3 p, inout Parts P) {
   float tcE = SHELL_T * (1.0 - 0.6 * uMeltC);
   float dCore = dO + tcE;
   float dShell = dO;
-  if (uImpactCount > 0 && dO < 0.35 && dO > -0.6) {
+  if (uCracks > 0.5 && dO < 0.35 && dO > -0.6) {
     float sink, fill, inHole, holeEdge;
     float vd = crackField(q, sink, fill, inHole, holeEdge);
     // the press pushes shell and ice cream in together
