@@ -125,91 +125,90 @@ body {
 }
 
 /* ---------------------------------------------------------------- dock --- */
+/* The ice creams stand in a row below the bottom edge of the screen, like
+   brushes in a tray: only their tops show. Hover lifts one out a little; the
+   one you're holding stays raised. */
 
 .dock {
-  --dock-size: 44px;
-  --dock-gap: 10px;
+  --tool-w: 34px;
+  --tool-h: calc(var(--tool-w) * 5 / 3); /* the icon's aspect (120 x 200) */
+  --peek: 36px; /* how much of a popsicle shows at rest */
+  --lift-hover: 12px;
+  --lift-on: 9px;
   position: fixed;
   left: 50%;
-  bottom: max(10px, env(safe-area-inset-bottom));
+  bottom: 0;
   translate: -50% 0;
   z-index: 2;
   display: flex;
   align-items: flex-end;
-  gap: var(--dock-gap);
-  padding: 0 10px 11px;
+  gap: 10px;
+  height: calc(var(--peek) + var(--lift-hover) + 34px + env(safe-area-inset-bottom));
+  overflow: hidden; /* the screen's bottom edge: everything below it is out of sight */
+  padding: 0 6px;
   opacity: 0;
   visibility: hidden;
-  transform: translateY(14px);
-  transition: opacity 900ms ease 400ms, transform 900ms cubic-bezier(0.2, 0.8, 0.2, 1) 400ms, visibility 0s 400ms;
+  transition: opacity 900ms ease 400ms, visibility 0s 400ms;
   -webkit-tap-highlight-color: transparent;
 }
 
 .is-ready .dock {
   opacity: 1;
   visibility: visible;
-  transform: none;
 }
 
 .dock-item {
-  --s: 1;
   position: relative;
   flex: none;
-  width: calc(var(--dock-size) * var(--s));
-  height: calc(var(--dock-size) * var(--s));
+  width: calc(var(--tool-w) + 10px); /* a little extra either side to aim at */
+  height: calc(var(--peek) + var(--lift-hover) + 34px + env(safe-area-inset-bottom));
   appearance: none;
   border: 0;
   background: none;
   padding: 0;
-  border-radius: 12px;
   cursor: pointer;
   touch-action: manipulation;
 }
 
 .dock-icon {
-  display: block;
-  width: 100%;
-  height: 100%;
-  transition: scale 160ms ease;
+  position: absolute;
+  left: 5px;
+  top: 100%;
+  width: var(--tool-w);
+  height: var(--tool-h);
+  translate: 0 calc(-1 * (var(--peek) + env(safe-area-inset-bottom)));
+  transition: translate 420ms cubic-bezier(0.34, 1.5, 0.64, 1);
 }
 
 .dock-icon img {
   display: block;
   width: 100%;
   height: 100%;
-  object-fit: contain;
   user-select: none;
   -webkit-user-drag: none;
-  filter: drop-shadow(0 2px 2.5px rgba(50, 30, 20, 0.22));
+  filter: drop-shadow(0 1px 2px rgba(50, 30, 20, 0.2));
+}
+
+.dock-item[aria-checked="true"] .dock-icon {
+  translate: 0 calc(-1 * (var(--peek) + var(--lift-on) + env(safe-area-inset-bottom)));
+}
+
+@media (hover: hover) {
+  .dock-item:hover .dock-icon {
+    translate: 0 calc(-1 * (var(--peek) + var(--lift-hover) + env(safe-area-inset-bottom)));
+  }
 }
 
 .dock-item:active .dock-icon {
-  scale: 0.92;
+  transition-duration: 120ms;
+  translate: 0 calc(-1 * (var(--peek) + var(--lift-on) - 3px + env(safe-area-inset-bottom)));
 }
 
-/* the dot under the one that's out */
-.dock-dot {
-  position: absolute;
-  left: 50%;
-  bottom: -8px;
-  width: 4px;
-  height: 4px;
-  margin-left: -2px;
-  border-radius: 50%;
-  background: #5f5a55;
-  opacity: 0;
-  transition: opacity 300ms ease;
-}
-
-.dock-item[aria-checked="true"] .dock-dot {
-  opacity: 0.8;
-}
-
-/* the name, floating over the icon you're on (plain text, like the weather words) */
+/* the name, floating over the one you're on (plain text, like the weather words) */
 .dock-label {
   position: absolute;
   left: 50%;
-  bottom: calc(100% + 10px);
+  bottom: calc(var(--peek) + var(--lift-hover) + 7px + env(safe-area-inset-bottom));
   translate: -50% 4px;
   font: 400 13px/1.2 "Neue Montreal", ui-sans-serif, -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;
   letter-spacing: 0.005em;
@@ -238,7 +237,7 @@ body {
 }
 
 .dock-item:focus-visible .dock-icon img {
-  filter: drop-shadow(0 2px 2.5px rgba(50, 30, 20, 0.22)) drop-shadow(0 0 3px #9ec3e6);
+  filter: drop-shadow(0 1px 2px rgba(50, 30, 20, 0.2)) drop-shadow(0 0 3px #9ec3e6);
 }
 
 @media (max-width: 520px) {
@@ -249,8 +248,8 @@ body {
     font-size: 13px;
   }
   .dock {
-    --dock-size: 42px;
-    --dock-gap: 8px;
+    --tool-w: 32px;
+    --peek: 32px;
   }
 }
 
@@ -334,6 +333,7 @@ noscript .fallback,
   #scene,
   .controls,
   .dock,
+  .dock-icon,
   .reset {
     transition: none;
   }

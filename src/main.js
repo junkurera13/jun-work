@@ -316,7 +316,6 @@ function selectFlavor(i) {
 const dock = new Dock(dockRoot, {
   items: FLAVORS,
   value: state.flavor,
-  reduceMotion,
   onChange: (i) => {
     audio.tick(1.1 + i * 0.12);
     selectFlavor(i);
@@ -324,21 +323,22 @@ const dock = new Dock(dockRoot, {
 });
 
 // Each dock icon is the real ice cream, rendered once by the same shader:
-// fresh from the freezer, standing at a jaunty angle.
+// straight on, through a very long lens (almost flat, like a product shot),
+// framing just the bar. The dock lets only the top peek up from the bottom.
 function renderDockIcons() {
-  const px = 168;
+  const w = 120;
+  const h = 200;
   const ss = 2; // supersampled, then scaled down for smooth edges
-  const D = 7.1 / TAN;
-  const elev = 0.12;
-  const eye = { x: 0, y: Math.sin(elev) * D, z: Math.cos(elev) * D };
-  const f = norm({ x: -eye.x, y: -eye.y, z: -eye.z });
-  const r = norm(cross(f, { x: 0, y: 1, z: 0 }));
-  const u = cross(r, f);
-  const q = quatMul(quatFromAxisAngle(0, 0, 1, -0.36), quatFromAxisAngle(0, 1, 0, -0.5));
-  const rot = mat3FromQuat(q);
-  const c = mulMat3(rot, 0, OBJ_CENTER_Y, 0);
-  const rel = { x: eye.x + c.x, y: eye.y + c.y, z: eye.z + c.z }; // eye relative to the object
-  const camObj = mulMat3T(rot, rel.x, rel.y, rel.z);
+  const tan = 0.05;
+  const half = 5.45; // half the framed height (cm)
+  const D = half / tan;
+  const centre = 0.55;
+  const eye = { x: 0, y: centre, z: D };
+  const f = { x: 0, y: 0, z: -1 };
+  const r = { x: 1, y: 0, z: 0 };
+  const u = { x: 0, y: 1, z: 0 };
+  const rot = mat3FromQuat(quatFromAxisAngle(0, 1, 0, -0.14)); // a hair of turn, for depth
+  const camObj = mulMat3T(rot, eye.x, eye.y, eye.z);
   const ro = mulMat3T(rot, r.x, r.y, r.z);
   const uo = mulMat3T(rot, u.x, u.y, u.z);
   const fo = mulMat3T(rot, f.x, f.y, f.z);
@@ -347,7 +347,7 @@ function renderDockIcons() {
       {
         camPos: camObj,
         camBasis: [ro.x, ro.y, ro.z, uo.x, uo.y, uo.z, fo.x, fo.y, fo.z],
-        tanHalfFov: TAN,
+        tanHalfFov: tan,
         objRot: rot,
         time: 0,
         boundMin: [BODY_BOX.min[0], STICK_Y0 - 0.2, BODY_BOX.min[2]],
@@ -364,15 +364,15 @@ function renderDockIcons() {
         weatherB: 0,
         lightTint: [1, 1, 1],
       },
-      px * ss,
-      px * ss,
+      w * ss,
+      h * ss,
     );
     const out = document.createElement("canvas");
-    out.width = px;
-    out.height = px;
+    out.width = w;
+    out.height = h;
     const g = out.getContext("2d");
     g.imageSmoothingQuality = "high";
-    g.drawImage(img, 0, 0, px, px);
+    g.drawImage(img, 0, 0, w, h);
     dock.setIcon(i, out.toDataURL("image/png"));
   });
 }
