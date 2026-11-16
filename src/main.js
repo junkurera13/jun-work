@@ -326,52 +326,52 @@ const dock = new Dock(dockRoot, {
 // a close-up of the front of the bar, turned and lit just like the big one,
 // so it shows the real thing (the gloss streak on the chocolate, the frost on
 // the rose ice). The page crops it to a circle.
-function renderOrbs() {
+function renderSwatch(flavor, { x, y, half }) {
   const px = 96;
   const ss = 2; // supersampled, then scaled down for smooth edges
   const tan = 0.05;
-  const half = 1.9; // half the width of the patch of surface shown (cm)
   const D = half / tan;
   const rot = mat3FromQuat(quatFromAxisAngle(0, 1, 0, REST_YAW));
-  const look = mulMat3(rot, 0.75, 0.9, 0); // the patch: right of the face, where gloss meets colour
-  const eye = { x: look.x, y: look.y, z: D };
-  const camObj = mulMat3T(rot, eye.x, eye.y, eye.z);
+  const look = mulMat3(rot, x, y, 0);
+  const camObj = mulMat3T(rot, look.x, look.y, D);
   const ro = mulMat3T(rot, 1, 0, 0);
   const uo = mulMat3T(rot, 0, 1, 0);
   const fo = mulMat3T(rot, 0, 0, -1);
-  FLAVORS.forEach((flavor, i) => {
-    const img = renderer.thumbnail(
-      {
-        camPos: camObj,
-        camBasis: [ro.x, ro.y, ro.z, uo.x, uo.y, uo.z, fo.x, fo.y, fo.z],
-        tanHalfFov: tan,
-        objRot: rot,
-        time: 0,
-        boundMin: BODY_BOX.min,
-        boundMax: BODY_BOX.max,
-        melt: meltParams(0, flavor.faluda),
-        cracks: false,
-        ooze: 0,
-        primCount: 0,
-        crumbCount: 0,
-        liqMin: [0, 0, 0],
-        liqMax: [0, 0, 0],
-        exposure: 1.0,
-        weatherA: [0, 0, 1, 0],
-        weatherB: 0,
-        lightTint: [1, 1, 1],
-      },
-      px * ss,
-      px * ss,
-    );
-    const out = document.createElement("canvas");
-    out.width = px;
-    out.height = px;
-    const g = out.getContext("2d");
-    g.imageSmoothingQuality = "high";
-    g.drawImage(img, 0, 0, px, px);
-    dock.setIcon(i, out.toDataURL("image/png"));
-  });
+  const img = renderer.thumbnail(
+    {
+      camPos: camObj,
+      camBasis: [ro.x, ro.y, ro.z, uo.x, uo.y, uo.z, fo.x, fo.y, fo.z],
+      tanHalfFov: tan,
+      objRot: rot,
+      time: 0,
+      boundMin: BODY_BOX.min,
+      boundMax: BODY_BOX.max,
+      melt: meltParams(0, flavor.faluda),
+      cracks: false,
+      ooze: 0,
+      primCount: 0,
+      crumbCount: 0,
+      liqMin: [0, 0, 0],
+      liqMax: [0, 0, 0],
+      exposure: 1.0,
+      weatherA: [0, 0, 1, 0],
+      weatherB: 0,
+      lightTint: [1, 1, 1],
+    },
+    px * ss,
+    px * ss,
+  );
+  const out = document.createElement("canvas");
+  out.width = px;
+  out.height = px;
+  const g = out.getContext("2d");
+  g.imageSmoothingQuality = "high";
+  g.drawImage(img, 0, 0, px, px);
+  return out.toDataURL("image/png");
+}
+
+function renderOrbs() {
+  FLAVORS.forEach((flavor, i) => dock.setIcon(i, renderSwatch(flavor, flavor.swatch)));
 }
 
 // ----------------------------------------------------------------- loop ----
@@ -574,5 +574,7 @@ window.__ice = {
   setTemp: (t) => weather.set(t <= -4 ? 0 : t < 20 ? 1 : t < 33 ? 2 : t < 40 ? 3 : 4),
   tap: (x, y) => onDown({ clientX: x, clientY: y, pointerId: 1, button: 0 }) || onUp({ pointerId: 1 }),
   renew: newIceCream,
+  // try a picker framing: __ice.swatch(0, { x, y, half }) -> image URL
+  swatch: (i, sw) => renderSwatch(FLAVORS[i], sw),
   fracture,
 };

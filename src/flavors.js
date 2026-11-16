@@ -11,6 +11,10 @@ export const FLAVORS = [
     name: "magic choc",
     faluda: false,
     shell: "choc",
+    // where the picker's round window looks onto the bar (cm, front face):
+    // low on the face, mostly deep chocolate with just a soft glint, since a
+    // patch of the big reflection reads as a grey stripe once it's cut out
+    swatch: { x: 0.3, y: -2.4, half: 1.9 },
     label: "A Magic Choc vanilla ice cream. Tap it to crack the chocolate shell; it melts slowly.",
   },
   {
@@ -18,6 +22,7 @@ export const FLAVORS = [
     name: "faluda",
     faluda: true,
     shell: "ice",
+    swatch: { x: 0.75, y: 0.9, half: 1.9 },
     label: "A pink Faluda popsicle with a vanilla ice cream center. Tap to crack the icy shell.",
   },
 ];
