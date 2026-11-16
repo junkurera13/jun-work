@@ -95,7 +95,7 @@ export function sn3(x, y, z) {
 
 // Puffy egg-shaped paddle (superellipsoid / analytic gradient), mirrors common.glsl
 export function sdBar(x, y, z) {
-  const a = mix(2.42, 2.86, smoothstep(-4.6, 1.8, y));
+  const a = mix(2.9, 2.38, smoothstep(-1.8, 4.6, y));
   const b = 4.8;
   const c = 1.2;
   const n = 2.5;

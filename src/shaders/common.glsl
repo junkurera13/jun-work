@@ -103,11 +103,11 @@ float sdRoundCone(vec3 p, vec3 a, vec3 b, float r1, float r2) {
 }
 
 // The undeformed bar: a soft, puffy egg-shaped paddle. The outline is a
-// rounded oval (a superellipse, fuller towards the top), and the cross
+// rounded oval (a superellipse, fuller towards the stick end), and the cross
 // section is a pillow: broad domed faces melting into fully rounded edges.
 // Distance = superellipsoid value / its analytic gradient.
 float sdBar(vec3 p) {
-  float a = mix(2.42, 2.86, smoothstep(-4.6, 1.8, p.y));
+  float a = mix(2.9, 2.38, smoothstep(-1.8, 4.6, p.y));
   const float b = 4.8;
   const float c = 1.2;
   const float n = 2.5;
