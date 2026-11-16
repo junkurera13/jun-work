@@ -44,6 +44,9 @@ uniform sampler2D uTextTex;
 uniform float uExposure;
 
 #include "common.glsl"
+#include "background.glsl"
+
+uniform vec3 uLightTint; // the weather tints the light on the ice cream
 
 const float TEXT_Y0 = -4.3;
 const float TEXT_Y1 = -0.15;
@@ -651,7 +654,7 @@ void main() {
   vec3 ro = uCamPos;
   float pixAngle = 2.0 * uTanHalfFov / uRes.y;
 
-  vec3 bg = vec3(1.0);
+  vec3 bg = background(gl_FragCoord.xy);
   float t0, t1;
   if (!boxHit(ro, rd, uBoundMin, uBoundMax, t0, t1)) {
     outColor = vec4(bg, 1.0);
@@ -682,7 +685,7 @@ void main() {
   }
   vec3 p = ro + rd * t;
   vec3 col = shade(p, rd, t * pixAngle);
-  col = aces(col * uExposure);
+  col = aces(col * uExposure * uLightTint);
   col = pow(col, vec3(1.0 / 2.2));
   // tiny dither against banding in the smooth gradients
   col += (hash12(gl_FragCoord.xy + fract(uTime) * 100.0) - 0.5) / 255.0;

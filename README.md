@@ -10,9 +10,9 @@ A blank white page with one Magic Choc vanilla ice cream on it.
   welling up through any cracks), then the chocolate softens. Drips run down the
   surface and the stick and fall off the bottom of the screen. Keep watching and the
   stick comes out.
-- The **dial** at the bottom sets the temperature, which sets the melt speed
-  (−18° is frozen, 29° is the default, 45° is very fast). Drag it, scroll on it or use
-  the arrow keys. Double-click it to reset. ↺ gives you a new ice cream.
+- The **weather buttons** at the bottom (❄️ 🌧️ ⛅ ☀️ 🔥) change the painted sky behind it and
+  how fast it melts: snow freezes it, brutal summer melts it in about a minute. ↺ gives you a new
+  ice cream.
 
 Everything is rendered live in one ray-marched fragment shader (no meshes and no
 image assets). The crack sounds are synthesised with WebAudio.
@@ -44,7 +44,8 @@ npm run build
 | `src/sim/fracture.js` | Crack paths (painted into a texture the shader reads), crushing, flying chips |
 | `src/sim/liquid.js` | Rivulets, hanging drops, pinch-off and falling drops |
 | `src/audio/crack.js` | Procedural chocolate-snap sounds |
-| `src/ui/dial.js` | Temperature dial |
+| `src/shaders/background.glsl` | The painted weather backdrop that fades into the white page |
+| `src/ui/weather.js` | Weather buttons |
 | `archive/` | The old portfolio |
 
-Run `__ice.setMelt(0.6)` or `__ice.setTemp(45)` in the console to jump around the melt.
+Run `__ice.setMelt(0.6)` or `__ice.setWeather(4)` in the console to jump around the melt.
