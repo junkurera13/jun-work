@@ -115,27 +115,47 @@ float crackS(vec3 q) {
 }
 
 float crackField(vec3 q, out float sink, out float fill, out float inHole, out float holeEdge,
-                 out float recess, out float gapAO) {
+                 out float recess, out float gapAO, out float sinkCore) {
   vec2 uv = vec2(crackS(q) + 0.5, (6.1 - q.y) / 11.52);
-  vec4 t = textureLod(uCrackTex, uv, 0.0);
+  vec4 t0 = textureLod(uCrackTex, uv, 0.0);
+  vec4 tb = textureLod(uCrackTex, uv, 2.5);
   // blurred copies of the crack mask (mip levels): how much crack is nearby
   float near = textureLod(uCrackTex, uv, 2.0).r;
   float wide = textureLod(uCrackTex, uv, 3.5).r;
-  float heal = 1.0 - smoothstep(0.45, 0.85, uMeltC);
+  // Melting doesn't heal anything: it softens it. Crisp breaks slump into
+  // rounded, blurred edges, hairline cracks fill in and fade, steps between
+  // plates smooth out, and holes stay open with soft melted rims.
+  float soft = smoothstep(0.25, 0.8, uMeltC);
+  vec4 t = mix(t0, vec4(clamp(tb.r * 1.35, 0.0, 1.0), tb.g, tb.b, tb.a), soft);
+  float crisp = 1.0 - soft;
   // pushed-in plates, plus chipped, rounded lips curling down into each crack
-  float lip = 0.045 * smoothstep(0.04, 0.5, near) * (1.0 - smoothstep(0.35, 0.6, t.r));
-  sink = (t.b * 0.13 + lip) * heal;
+  float lip = 0.045 * smoothstep(0.04, 0.5, near) * (1.0 - smoothstep(0.35, 0.6, t.r)) * crisp;
+  sink = t.b * 0.13 * mix(1.0, 0.5, soft) + lip;
+  // the ice cream under the shell follows the plates only softly, so popped
+  // neighbouring chips leave one smooth vanilla surface, not steps
+  float smoothSink = textureLod(uCrackTex, uv, 3.0).b * 0.13 * mix(1.0, 0.5, soft);
+  // ...but never above a plate that's still there
+  float openHole = smoothstep(0.6, 0.9, wide);
+  sinkCore = mix(max(smoothSink, sink - 0.5 * SHELL_T), smoothSink, openHole);
   // the soft ice cream under a crack is pushed down and away: you look down
-  // into the gap past the chocolate walls
-  recess = 0.09 * smoothstep(0.03, 0.45, wide) * heal;
+  // into the gap past the chocolate walls (it slumps flatter as it melts)
+  recess = 0.09 * smoothstep(0.03, 0.45, wide) * mix(1.0, 0.45, soft);
   // narrow, deep gaps are shadowed inside; wide openings stay bright
-  gapAO = mix(0.72, 1.0, smoothstep(0.12, 0.6, near));
+  gapAO = mix(mix(0.72, 0.9, soft), 1.0, smoothstep(0.12, 0.6, near));
   // only right next to an actual crack
-  fill = uOoze * heal * smoothstep(0.02, 0.25, near);
+  fill = uOoze * smoothstep(0.02, 0.25, near);
   inHole = step(0.6, t.g) * step(0.9, t.r);
   holeEdge = inHole > 0.5 ? -0.2 : 1e5;
-  // R crosses 0.5 at the crack edge; ~1 texel (0.01 cm) per 0.5 of mask
-  return (0.5 - t.r * heal) * 0.02;
+  // R crosses 0.5 at the crack edge; a gentle slope keeps the ray marcher
+  // from overshooting the crack walls (softer still once it's melting)
+  // Far from any crack the void must be clearly 'not here', otherwise it
+  // clips the shell a hair below the surface and bends the normals everywhere.
+  // ...and inside a crack or an open hole it must be clearly 'void', deep
+  // enough that rays at any resolution pass through to the ice cream.
+  return (0.5 - t.r) * mix(0.01, 0.006, soft)
+       + 0.25 * (1.0 - smoothstep(0.0, 0.06, near))
+       - 0.03 * smoothstep(0.3, 0.8, near)
+       - 0.1 * smoothstep(0.6, 1.0, wide);
 }
 
 void bodyEval(vec3 p, inout Parts P) {
@@ -149,11 +169,11 @@ void bodyEval(vec3 p, inout Parts P) {
   float dCore = dO + tcE;
   float dShell = dO;
   if (uCracks > 0.5 && dO < 0.35 && dO > -0.6) {
-    float sink, fill, inHole, holeEdge, recess, gapAO;
-    float vd = crackField(q, sink, fill, inHole, holeEdge, recess, gapAO);
+    float sink, fill, inHole, holeEdge, recess, gapAO, sinkCore;
+    float vd = crackField(q, sink, fill, inHole, holeEdge, recess, gapAO, sinkCore);
     // the press pushes shell and ice cream in together
     dShell = max(dO + sink, -vd);
-    dCore += sink + recess;
+    dCore += sinkCore + recess;
     P.cao = gapAO;
     P.sink = sink;
     P.fill = fill;
@@ -166,8 +186,8 @@ void bodyEval(vec3 p, inout Parts P) {
       // softened vanilla creeps up *inside* the cracks, a little more as it
       // melts, until it forms a thin glossy bead along the crack line
       float level = dO + sink + (tcE + recess) * (1.0 - fill) - 0.018 * fill * fill;
-      // vd is only +0.01 away from cracks, so the spread must stay below that
-      float dFill = max(level, vd - 0.006 * fill);
+      // vd is only +0.005 away from cracks, so the spread must stay below that
+      float dFill = max(level, vd - 0.004 * fill);
       dCore = smin(dCore, dFill, 0.02);
     }
   }

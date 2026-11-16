@@ -78,7 +78,7 @@ export class Fracture {
     this.canvas = document.createElement("canvas");
     this.canvas.width = CRACK_W;
     this.canvas.height = CRACK_H;
-    this.g = this.canvas.getContext("2d");
+    this.g = this.canvas.getContext("2d", { willReadFrequently: true });
     this.reset();
   }
 
@@ -146,21 +146,22 @@ export class Fracture {
     this.any = true;
     this.ooze = Math.max(this.ooze, 0.22); // a press squeezes a little vanilla up
     let type = "crack";
-    // pressing a broken plate again pops it out
-    const hitCell = this.cellAt(face, q.x, q.y);
-    if (hitCell && !hitCell.removed) {
-      this.popCell(hitCell, now);
-      this.spawnCrumbs(hit, 3 + Math.floor(rand(0, 3)), world, 0.12, 0.26);
+    // Is the spot under the finger a piece that's already broken free (fully
+    // enclosed by cracks or holes)? Then it pops out as a chip. Otherwise the
+    // shell breaks into a few good-sized plates. Never cracks on top of cracks.
+    const region = this.freePiece(q.x, q.y);
+    if (region) {
+      this.popRegion(region, now);
+      const sz = Math.min(0.42, Math.max(0.12, Math.sqrt(region.area) * 0.42));
+      this.spawnCrumbs(hit, 1 + Math.floor(rand(0, 2)), world, sz * 0.8, sz);
+      this.spawnCrumbs(hit, 1 + Math.floor(rand(0, 3)), world, 0.04, 0.09);
       type = "crunch";
     } else {
       const imp = { id: this.nextId++, x: q.x, y: q.y, face, hole: 0, born: now, low: q.y, cells: [] };
       this.impacts.push(imp);
-      // a press inside an already broken area breaks smaller
-      const R = hitCell ? rand(0.7, 1.1) : rand(1.5, 2.5);
-      if (!hitCell && Math.random() < 0.16) this.curvedSplit(imp, now);
-      else this.shatter(imp, R, now);
+      if (Math.random() < 0.14) this.curvedSplit(imp, now);
+      else this.shatter(imp, rand(1.4, 2.3), now);
       this.spawnCrumbs(hit, 2 + Math.floor(rand(0, 3)), world, 0.04, 0.1);
-      if (hitCell) type = "crunch";
     }
     this.flush();
     return { type };
@@ -174,19 +175,6 @@ export class Fracture {
     this.texDirty = true;
   }
 
-  cellAt(face, x, y) {
-    for (let k = this.impacts.length - 1; k >= 0; k--) {
-      const imp = this.impacts[k];
-      if (imp.face !== face) continue;
-      for (const c of imp.cells) {
-        if (!c.closed) continue;
-        const P = period(y);
-        if (pointInPoly(x, y, c.poly) || pointInPoly(x + P, y, c.poly) || pointInPoly(x - P, y, c.poly)) return c;
-      }
-    }
-    return null;
-  }
-
   /**
    * Shatter a patch of shell around the press into irregular plates:
    * a Voronoi pattern of random seeds, small plates under the finger and
@@ -196,12 +184,16 @@ export class Fracture {
    */
   shatter(imp, R, now) {
     const { face, x, y, id } = imp;
+    // seeds kept well apart so no plate is a tiny sliver: smallish plates
+    // under the finger, bigger ones further out
     const seeds = [[x, y]];
-    const n = 6 + Math.floor(rand(0, 6));
-    for (let i = 0; i < n; i++) {
+    const want = 5 + Math.floor(rand(0, 4));
+    for (let tries = 0; tries < 200 && seeds.length < want + 1; tries++) {
       const a = rand(0, Math.PI * 2);
-      const r = R * Math.pow(rand(0.12, 1), 0.75);
-      seeds.push([x + Math.cos(a) * r, y + Math.sin(a) * r]);
+      const r = R * Math.pow(rand(0.15, 1), 0.8);
+      const p = [x + Math.cos(a) * r, y + Math.sin(a) * r];
+      const minGap = 0.55 + 0.45 * (r / R);
+      if (seeds.every((q) => Math.hypot(q[0] - p[0], q[1] - p[1]) > minGap)) seeds.push(p);
     }
     const B = R * 1.7;
     const box = [[x - B, y - B], [x + B, y - B], [x + B, y + B], [x - B, y + B]];
@@ -353,16 +345,6 @@ export class Fracture {
     return pts;
   }
 
-  /** A broken plate pops right out, showing the soft ice cream under it. */
-  popCell(cell, now) {
-    cell.removed = true;
-    this.ops.push({ t: now, kind: "hole", face: cell.face, poly: cell.poly });
-    const imp = cell.imp;
-    imp.hole = Math.max(imp.hole, 0.3);
-    imp.low = Math.min(imp.low, ...cell.poly.map((p) => p[1]));
-    this.ooze = Math.max(this.ooze, 0.4);
-  }
-
   /**
    * One side of a crack drops into the ice cream (a smooth slope, deepest
    * at the crack), see drawDrop.
@@ -377,6 +359,114 @@ export class Fracture {
     nx = (nx / l) * side;
     ny = (ny / l) * side;
     this.ops.push({ t: t0, kind: "drop", face, pts, nx, ny, v: Math.floor(depth * 255), width });
+  }
+
+  /**
+   * Flood-fill the crack map from (u, y). If the patch of shell there is
+   * fully enclosed by cracks / holes and not too big, it's a free piece:
+   * return its pixels. Otherwise (it's still attached) return null.
+   */
+  freePiece(u, y) {
+    const [cx, cy] = this.px(0, u, y);
+    const H = 230; // look up to 2.3 cm around
+    const x0 = Math.max(0, Math.floor(cx - H));
+    const y0 = Math.max(0, Math.floor(cy - H));
+    const x1 = Math.min(CRACK_W, Math.ceil(cx + H));
+    const y1 = Math.min(CRACK_H, Math.ceil(cy + H));
+    const w = x1 - x0;
+    const h = y1 - y0;
+    if (w < 8 || h < 8) return null;
+    const img = this.g.getImageData(x0, y0, w, h).data;
+    const S = 2; // work on a 2-texel grid
+    const gw = Math.floor(w / S);
+    const gh = Math.floor(h / S);
+    const blocked = new Uint8Array(gw * gh);
+    for (let j = 0; j < gh; j++) {
+      for (let i = 0; i < gw; i++) {
+        blocked[j * gw + i] = img[((j * S) * w + i * S) * 4] > 90 ? 1 : 0;
+      }
+    }
+    // start at the finger (or the nearest un-cracked texel right next to it)
+    let sx = Math.floor((cx - x0) / S);
+    let sy = Math.floor((cy - y0) / S);
+    if (sx < 0 || sy < 0 || sx >= gw || sy >= gh) return null;
+    if (blocked[sy * gw + sx]) {
+      let found = false;
+      for (let r = 1; r <= 4 && !found; r++) {
+        for (let dy = -r; dy <= r && !found; dy++) {
+          for (let dx = -r; dx <= r && !found; dx++) {
+            const nx = sx + dx;
+            const ny = sy + dy;
+            if (nx >= 0 && ny >= 0 && nx < gw && ny < gh && !blocked[ny * gw + nx]) {
+              sx = nx;
+              sy = ny;
+              found = true;
+            }
+          }
+        }
+      }
+      if (!found) return null;
+    }
+    const maxCells = Math.floor((3.4 * PX * PX) / (S * S)); // up to 3.4 cm^2
+    const seen = new Uint8Array(gw * gh);
+    const stack = [sy * gw + sx];
+    seen[sy * gw + sx] = 1;
+    const cells = [];
+    while (stack.length) {
+      const k = stack.pop();
+      cells.push(k);
+      if (cells.length > maxCells) return null; // still part of the big shell
+      const i = k % gw;
+      const j = (k / gw) | 0;
+      if (i === 0 || j === 0 || i === gw - 1 || j === gh - 1) return null; // leaks out
+      for (const n of [k - 1, k + 1, k - gw, k + gw]) {
+        if (!seen[n] && !blocked[n]) {
+          seen[n] = 1;
+          stack.push(n);
+        }
+      }
+    }
+    // a piece also has to be on the shell (not off the end of the bar)
+    let minY = Infinity;
+    for (const k of cells) minY = Math.min(minY, (k / gw) | 0);
+    return { x0, y0, w, h, gw, S, cells, area: (cells.length * S * S) / (PX * PX), u, y };
+  }
+
+  /** Knock a free piece right out, showing the soft ice cream under it. */
+  popRegion(region, now) {
+    const { x0, y0, w, h, gw, S, cells } = region;
+    if (!this.tmp) this.tmp = document.createElement("canvas");
+    const c = this.tmp;
+    if (c.width < w) c.width = w;
+    if (c.height < h) c.height = h;
+    const t = c.getContext("2d");
+    t.globalCompositeOperation = "source-over";
+    t.clearRect(0, 0, c.width, c.height);
+    const id = t.createImageData(w, h);
+    const d = id.data;
+    let lowJ = 0;
+    for (const k of cells) {
+      const i = k % gw;
+      const j = (k / gw) | 0;
+      lowJ = Math.max(lowJ, j);
+      // grow each cell by a texel so the piece takes its crack edges with it
+      for (let yy = j * S - 1; yy < j * S + S + 1; yy++) {
+        for (let xx = i * S - 1; xx < i * S + S + 1; xx++) {
+          if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue;
+          const o = (yy * w + xx) * 4;
+          d[o] = 255;
+          d[o + 1] = 120;
+          d[o + 3] = 255;
+        }
+      }
+    }
+    t.putImageData(id, 0, 0);
+    this.g.drawImage(c, 0, 0, w, h, x0, y0, w, h);
+    this.texDirty = true;
+    // remember it for drips: the lowest point of the hole
+    const lowY = Y1 - (y0 + lowJ * S) / PX;
+    this.impacts.push({ id: this.nextId++, x: region.u, y: region.y, face: 0, hole: 0.3, born: now, low: lowY, cells: [] });
+    this.ooze = Math.max(this.ooze, 0.4);
   }
 
   spawnCrumbs(hit, count, world, s0, s1) {
