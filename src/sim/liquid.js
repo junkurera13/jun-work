@@ -61,7 +61,7 @@ export class Liquid {
   surfaceZ(x, y, side, M) {
     if (bodyOuter(x, y, 0, M) > -0.18) return null;
     let lo = 0;
-    let hi = 2.6;
+    let hi = 3.0;
     for (let i = 0; i < 16; i++) {
       const mid = (lo + hi) * 0.5;
       if (bodyOuter(x, y, side * mid, M) < 0) lo = mid;

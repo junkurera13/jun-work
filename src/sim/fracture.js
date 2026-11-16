@@ -155,7 +155,7 @@ export class Fracture {
     const o = refToObj(imp.x, imp.y, 0, M.sag, M.bulge, M.taper, M.shrink);
     if (bodyOuter(o.x, o.y, 0, M) > 0) return null;
     let lo = 0;
-    let hi = 2.6;
+    let hi = 3.0;
     for (let i = 0; i < 16; i++) {
       const mid = (lo + hi) / 2;
       if (bodyOuter(o.x, o.y, imp.face * mid, M) < 0) lo = mid;
