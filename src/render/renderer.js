@@ -277,7 +277,6 @@ export class Renderer {
     gl.useProgram(this.prog);
     const u = this.u;
     gl.uniform1i(u.uThumb, thumb ? 1 : 0);
-    gl.uniform1i(u.uOrb, thumb && U.orb ? 1 : 0);
     gl.uniform2f(u.uRes, W, H);
     gl.uniform4fv(u.uWeatherA, U.weatherA);
     gl.uniform1f(u.uWeatherB, U.weatherB);

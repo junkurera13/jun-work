@@ -322,25 +322,33 @@ const dock = new Dock(dockRoot, {
   },
 });
 
-// Each picker orb is a ball of that ice cream's own shell (glossy
-// chocolate, frosty rose ice...), rendered once by the same shader, straight
-// on through a very long lens.
+// Each picker circle is a round window onto that ice cream's own surface:
+// a close-up of the front of the bar, turned and lit just like the big one,
+// so it shows the real thing (the gloss streak on the chocolate, the frost on
+// the rose ice). The page crops it to a circle.
 function renderOrbs() {
   const px = 96;
   const ss = 2; // supersampled, then scaled down for smooth edges
   const tan = 0.05;
-  const D = 2.12 / tan;
+  const half = 1.9; // half the width of the patch of surface shown (cm)
+  const D = half / tan;
+  const rot = mat3FromQuat(quatFromAxisAngle(0, 1, 0, REST_YAW));
+  const look = mulMat3(rot, 0.75, 0.9, 0); // the patch: right of the face, where gloss meets colour
+  const eye = { x: look.x, y: look.y, z: D };
+  const camObj = mulMat3T(rot, eye.x, eye.y, eye.z);
+  const ro = mulMat3T(rot, 1, 0, 0);
+  const uo = mulMat3T(rot, 0, 1, 0);
+  const fo = mulMat3T(rot, 0, 0, -1);
   FLAVORS.forEach((flavor, i) => {
     const img = renderer.thumbnail(
       {
-        orb: true,
-        camPos: { x: 0, y: 0, z: D },
-        camBasis: [1, 0, 0, 0, 1, 0, 0, 0, -1],
+        camPos: camObj,
+        camBasis: [ro.x, ro.y, ro.z, uo.x, uo.y, uo.z, fo.x, fo.y, fo.z],
         tanHalfFov: tan,
-        objRot: [1, 0, 0, 0, 1, 0, 0, 0, 1],
+        objRot: rot,
         time: 0,
-        boundMin: [-2.3, -2.3, -2.3],
-        boundMax: [2.3, 2.3, 2.3],
+        boundMin: BODY_BOX.min,
+        boundMax: BODY_BOX.max,
         melt: meltParams(0, flavor.faluda),
         cracks: false,
         ooze: 0,

@@ -1,8 +1,8 @@
 /**
- * The flavor picker: a row of little orbs in the bottom-left corner of the
- * painting, each a ball of that ice cream's own shell. Hovering one swells it
- * and shows its name; a fine ring marks the one on screen. Arrow keys move
- * between them.
+ * The flavor picker: a row of little circles in the bottom-left corner of the
+ * painting, each a round window onto that ice cream's own surface. Hovering
+ * one swells it and shows its name; the one on screen is bigger. Arrow keys
+ * move between them.
  */
 export class Dock {
   constructor(root, { items, value = 0, onChange }) {

@@ -13,7 +13,6 @@ uniform mat3 uObjRot;      // object -> world rotation
 uniform float uTime;
 uniform bool uFaluda;
 uniform bool uThumb;      // picker icon: no backdrop, coverage goes to alpha
-uniform bool uOrb;        // picker icon: a ball of the shell instead of the ice cream
 
 uniform vec3 uBoundMin;
 uniform vec3 uBoundMax;
@@ -351,12 +350,6 @@ float scene(vec3 p, bool full, out Parts P) {
   P.shell = 1e5; P.core = 1e5; P.body = 1e5; P.stick = 1e5;
   P.liq = 1e5; P.liqC = 0.0; P.frag = 1e5; P.fragSide = 0.0; P.crumb = 1e5;
   P.outer = 1e5; P.hn = 0.0; P.fill = 0.0; P.hole = 0.0; P.sink = 0.0; P.cao = 1.0; P.cnear = 0.0; P.q = p;
-  if (uOrb) {
-    // a 4 cm ball made of the ice cream's outer shell
-    float d = length(p) - 2.0;
-    P.shell = d; P.body = d; P.outer = d; P.hn = 0.55;
-    return d;
-  }
 
   vec3 o = max(BODY_MIN - p, p - BODY_MAX);
   float bb = length(max(o, 0.0));
@@ -550,8 +543,8 @@ Mat faludaIce(vec3 p, vec3 q, float melt) {
   vec3 c = mix(deep, rose, tone);
   // frost bloom
   float o = faludaOutline(q.xy);
-  float rim = uOrb ? smoothstep(1.15, 1.97, length(q.xy)) : 1.0 - smoothstep(0.25, 1.35, -o);
-  float top = uOrb ? smoothstep(0.4, 2.0, q.y) : smoothstep(2.6, 5.6, q.y);
+  float rim = 1.0 - smoothstep(0.25, 1.35, -o);
+  float top = smoothstep(2.6, 5.6, q.y);
   float patchy = smoothstep(0.25, 0.75, sn3(p * 1.7 + 11.0) * 0.7 + sn3(p * 4.1 + 3.0) * 0.3);
   float frost = clamp(0.05 + 0.45 * rim + 0.12 * top, 0.0, 1.0) * mix(0.55, 1.0, patchy) * (1.0 - thaw);
   c = mix(c, srgb(vec3(0.97, 0.64, 0.72)), frost * 0.5);
