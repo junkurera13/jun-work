@@ -78,7 +78,7 @@ body {
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  cursor: ns-resize;
+  cursor: grab;
   touch-action: none;
   outline: none;
   transition: transform 160ms ease;
@@ -223,4 +223,8 @@ noscript .fallback,
   .reset {
     transition: none;
   }
+}
+
+.dial.is-active {
+  cursor: grabbing;
 }

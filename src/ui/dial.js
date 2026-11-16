@@ -67,27 +67,53 @@ export class Dial {
     k.addEventListener("pointerdown", (e) => {
       e.preventDefault();
       e.stopPropagation();
-      k.setPointerCapture(e.pointerId);
-      drag = { x: e.clientX, y: e.clientY, v: this.value };
+      try {
+        k.setPointerCapture(e.pointerId);
+      } catch {
+        /* capture not available: window listeners below still end the drag */
+      }
+      drag = { id: e.pointerId, a: this.angleAt(e), v: this.value };
       k.classList.add("is-active");
     });
+    // Turning the knob: the pointer's angle around the knob's centre drives
+    // the indicator 1:1, so it feels the same at every point of the dial.
     k.addEventListener("pointermove", (e) => {
-      if (!drag) return;
-      const dv = (e.clientX - drag.x - (e.clientY - drag.y)) * 0.32;
-      this.set(drag.v + dv);
+      if (!drag || e.pointerId !== drag.id) return;
+      // a mouse whose button is no longer down can't be dragging
+      if (e.pointerType === "mouse" && e.buttons === 0) {
+        end();
+        return;
+      }
+      const a = this.angleAt(e);
+      if (a === null) return; // too close to the centre to read an angle
+      if (drag.a === null) {
+        drag.a = a;
+        return;
+      }
+      let d = a - drag.a;
+      if (d > Math.PI) d -= 2 * Math.PI;
+      if (d < -Math.PI) d += 2 * Math.PI;
+      drag.a = a;
+      const perDeg = (TEMP_MAX - TEMP_MIN) / SWEEP;
+      drag.v = Math.max(TEMP_MIN, Math.min(TEMP_MAX, drag.v + ((d * 180) / Math.PI) * perDeg));
+      this.set(drag.v);
     });
-    const end = (e) => {
+    const end = () => {
       if (!drag) return;
+      const id = drag.id;
       drag = null;
       k.classList.remove("is-active");
       try {
-        k.releasePointerCapture(e.pointerId);
+        if (k.hasPointerCapture(id)) k.releasePointerCapture(id);
       } catch {
         /* already released */
       }
     };
     k.addEventListener("pointerup", end);
     k.addEventListener("pointercancel", end);
+    k.addEventListener("lostpointercapture", end);
+    window.addEventListener("pointerup", end);
+    window.addEventListener("blur", end);
     k.addEventListener(
       "wheel",
       (e) => {
@@ -110,6 +136,15 @@ export class Dial {
         this.set(TEMP_MAX);
       }
     });
+  }
+
+  /** Pointer angle around the knob centre, clockwise from 12 o'clock (radians). */
+  angleAt(e) {
+    const r = this.knob.getBoundingClientRect();
+    const dx = e.clientX - (r.left + r.width / 2);
+    const dy = e.clientY - (r.top + r.height / 2);
+    if (Math.hypot(dx, dy) < 5) return null;
+    return Math.atan2(dx, -dy);
   }
 
   set(v, notify = true) {
