@@ -768,10 +768,12 @@ vec3 shade(vec3 p, vec3 rd, float pix) {
     Mat bm;
     if (P.shell <= P.core) {
       if (P.outer + P.sink < -0.008) {
-        // raw broken edge when frozen; melted, it's just soft chocolate
+        // raw broken edge when frozen; melted, it's just the soft shell again
+        // (chocolate, or wet ice: never chocolate under the faluda's rose ice)
         float slumpS = smoothstep(0.2, 0.55, uMeltC);
         Mat soft;
         if (uPassion) soft = passionIce(p, P.q, n, chocLocal, true);
+        else if (uFaluda) soft = faludaIce(p, P.q, chocLocal);
         else soft = chocolate(p, chocLocal);
         bm = mixMat(fracture(), soft, slumpS);
         bumpAmp = 0.45 * (1.0 - slumpS); bumpFreq = 32.0;
