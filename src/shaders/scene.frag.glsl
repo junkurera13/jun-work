@@ -245,7 +245,7 @@ float sdStickBase(vec3 p) {
   vec2 q = p.xy;
   q.y -= clamp(q.y, STICK_Y0 + STICK_HW, STICK_Y1 - STICK_HW);
   float d2 = length(q) - STICK_HW;
-  float re = 0.045;
+  float re = 0.06;
   vec2 w = vec2(d2 + re, abs(p.z) - STICK_HT + re);
   return min(max(w.x, w.y), 0.0) + length(max(w, 0.0)) - re;
 }
@@ -514,12 +514,17 @@ Mat fracture() {
 
 Mat wood(vec3 p, float engr) {
   Mat m;
-  float g = vnoise2(vec2(p.x * 9.0 + 1.3 * vnoise2(p.xy * vec2(2.0, 0.25)), p.y * 0.35));
-  float rings = 0.5 + 0.5 * sin((p.x + 0.35 * vnoise2(p.xy * vec2(1.4, 0.18)) * 2.0) * 38.0);
-  float fib = vnoise2(p.xy * vec2(70.0, 2.2));
-  vec3 base = srgb(vec3(0.86, 0.73, 0.54));
-  vec3 dark = srgb(vec3(0.74, 0.58, 0.39));
-  vec3 c = mix(base, dark, 0.45 * rings * g + 0.25 * fib);
+  // pressed birch: warm tan, matte and fuzzy, mottled rather than striped,
+  // with fine fibres running along the stick and the odd darker fleck
+  vec2 w = p.xy + vec2(0.0, p.z * 3.0);
+  float mott = vnoise2(w * vec2(7.0, 2.2) + 3.0) * 0.6 + vnoise2(w * vec2(16.0, 5.0)) * 0.4;
+  float fib = vnoise2(w * vec2(85.0, 4.0));
+  float fib2 = vnoise2(w * vec2(160.0, 9.0) + 11.0);
+  float speck = smoothstep(0.8, 0.95, vnoise2(w * vec2(45.0, 22.0) + 7.0));
+  vec3 base = srgb(vec3(0.86, 0.72, 0.53));
+  vec3 dark = srgb(vec3(0.73, 0.57, 0.38));
+  vec3 c = mix(base, dark, 0.45 * mott + 0.22 * fib + 0.12 * fib2);
+  c = mix(c, srgb(vec3(0.56, 0.41, 0.26)), speck * 0.45);
   // where the ice cream used to sit the wood is damp and a little stained
   float inBar = smoothstep(BAR_BOTTOM - 0.4, BAR_BOTTOM + 0.6, p.y);
   float damp = inBar * uWet;
@@ -527,7 +532,7 @@ Mat wood(vec3 p, float engr) {
   vec3 burnt = srgb(vec3(0.3, 0.17, 0.09));
   c = mix(c, burnt, smoothstep(0.08, 0.7, engr) * 0.92);
   m.albedo = c;
-  m.rough = mix(0.72, 0.38, damp) + 0.1 * engr;
+  m.rough = mix(0.86, 0.45, damp) + 0.06 * engr;
   m.sss = 0.06;
   m.sssCol = srgb(vec3(0.9, 0.7, 0.45));
   m.spec = 0.7;
@@ -580,7 +585,7 @@ vec3 shade(vec3 p, vec3 rd, float pix) {
     if (P.stick < 0.05 && abs(p.z) > 0.05) engr = engraveMask(p);
     Mat sm = wood(p, engr);
     float ws = sminMix(P.body, P.stick, uStickK);
-    if (ws > 0.5) { bumpAmp = 0.12; bumpFreq = 40.0; bumpAmp2 = 0.0; }
+    if (ws > 0.5) { bumpAmp = 0.22; bumpFreq = 55.0; bumpAmp2 = 0.0; }
     bm = mixMat(bm, sm, ws);
     float dbs = smin(P.body, P.stick, uStickK);
     float wl = sminMix(dbs, P.liq, 0.13);

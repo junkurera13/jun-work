@@ -26,6 +26,7 @@ export function engravingCanvas() {
     g.save();
     g.translate(W / 2 + jx * 2, slot * (i + 0.5) + (i > 3 ? -slot * 0.5 : 0) + 4);
     g.rotate(jx * 0.015);
+    g.scale(0.8, 1); // the stick got wider: keep the letters in proportion
     g.fillText(ch, 0, 0);
     g.restore();
   });

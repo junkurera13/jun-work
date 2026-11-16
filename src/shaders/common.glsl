@@ -8,8 +8,8 @@ const float BAR_BOTTOM = -4.8;
 const float BAR_HEIGHT = 9.6;
 const float SHELL_T = 0.08;      // chocolate shell thickness (0.8 mm)
 
-const float STICK_HW = 0.47;     // half width
-const float STICK_HT = 0.1;      // half thickness
+const float STICK_HW = 0.6;      // half width (a broad 1.2 cm stick)
+const float STICK_HT = 0.14;     // half thickness (a chunky 2.8 mm)
 const float STICK_Y0 = -9.3;     // bottom extreme
 const float STICK_Y1 = 2.1;      // top extreme (inside the bar)
 
@@ -107,10 +107,11 @@ float sdRoundCone(vec3 p, vec3 a, vec3 b, float r1, float r2) {
 // section is a pillow: broad domed faces melting into fully rounded edges.
 // Distance = superellipsoid value / its analytic gradient.
 float sdBar(vec3 p) {
-  float a = mix(2.9, 2.38, smoothstep(-1.8, 4.6, p.y));
+  // broad, flatter base by the stick; narrower, rounder top
+  float a = mix(2.98, 2.48, smoothstep(-3.2, 4.8, p.y));
   const float b = 4.8;
   const float c = 1.2;
-  const float n = 2.5;
+  float n = mix(2.95, 2.45, smoothstep(-4.8, 4.8, p.y));
   const float m = 2.6;
   vec3 s = max(vec3(abs(p.x) / a, abs(p.y) / b, abs(p.z) / c), vec3(1e-5));
   float u = pow(pow(s.x, n) + pow(s.y, n), 1.0 / n);

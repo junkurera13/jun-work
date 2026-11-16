@@ -5,8 +5,8 @@
 export const BAR_BOTTOM = -4.8;
 export const BAR_HEIGHT = 9.6;
 export const SHELL_T = 0.08;
-export const STICK_HW = 0.47;
-export const STICK_HT = 0.1;
+export const STICK_HW = 0.6;
+export const STICK_HT = 0.14;
 export const STICK_Y0 = -9.3;
 export const STICK_Y1 = 2.1;
 
@@ -95,10 +95,10 @@ export function sn3(x, y, z) {
 
 // Puffy egg-shaped paddle (superellipsoid / analytic gradient), mirrors common.glsl
 export function sdBar(x, y, z) {
-  const a = mix(2.9, 2.38, smoothstep(-1.8, 4.6, y));
+  const a = mix(2.98, 2.48, smoothstep(-3.2, 4.8, y));
   const b = 4.8;
   const c = 1.2;
-  const n = 2.5;
+  const n = mix(2.95, 2.45, smoothstep(-4.8, 4.8, y));
   const m = 2.6;
   const sx = Math.max(Math.abs(x) / a, 1e-5);
   const sy = Math.max(Math.abs(y) / b, 1e-5);
@@ -163,7 +163,7 @@ export function bodyOuter(x, y, z, M) {
 export function sdStick(x, y, z) {
   const qy = y - clamp(y, STICK_Y0 + STICK_HW, STICK_Y1 - STICK_HW);
   const d2 = Math.hypot(x, qy) - STICK_HW;
-  const re = 0.045;
+  const re = 0.06;
   const wx = d2 + re;
   const wy = Math.abs(z) - STICK_HT + re;
   return Math.min(Math.max(wx, wy), 0) + Math.hypot(Math.max(wx, 0), Math.max(wy, 0)) - re;
