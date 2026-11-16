@@ -5,8 +5,6 @@
 export const BAR_BOTTOM = -4.8;
 export const BAR_HEIGHT = 9.6;
 export const SHELL_T = 0.13;
-export const CELL = 1.18;
-export const JIT = 0.72;
 export const STICK_HW = 0.47;
 export const STICK_HT = 0.1;
 export const STICK_Y0 = -9.3;
@@ -175,65 +173,4 @@ export function sdStick(x, y, z) {
   const wx = d2 + re;
   const wy = Math.abs(z) - STICK_HT + re;
   return Math.min(Math.max(wx, wy), 0) + Math.hypot(Math.max(wx, 0), Math.max(wy, 0)) - re;
-}
-
-// ------------------------------------------------------------- fracture ----
-
-export function cellSeed(gx, gy) {
-  const h = hash22(gx + 17, gy + 17);
-  return [(gx + 0.5 + (h[0] - 0.5) * JIT) * CELL, (gy + 0.5 + (h[1] - 0.5) * JIT) * CELL];
-}
-
-export function warpXY(x, y) {
-  return [
-    x + 0.2 * (vnoise2(x * 1.6, y * 1.6) - 0.5) + 0.05 * (vnoise2(x * 6.1 + 4, y * 6.1 + 4) - 0.5),
-    y + 0.2 * (vnoise2(x * 1.6 + 31.7, y * 1.6 + 31.7) - 0.5) + 0.05 * (vnoise2(x * 6.1 + 13.1, y * 6.1 + 13.1) - 0.5),
-  ];
-}
-
-/** Nearest fracture cell for a reference-space point (already warped). */
-export function voronoi(wx, wy) {
-  const nx = Math.floor(wx / CELL);
-  const ny = Math.floor(wy / CELL);
-  let md = 1e9;
-  let mg = [nx, ny];
-  let mr = [0, 0];
-  for (let j = -1; j <= 1; j++) {
-    for (let i = -1; i <= 1; i++) {
-      const s = cellSeed(nx + i, ny + j);
-      const rx = s[0] - wx;
-      const ry = s[1] - wy;
-      const d = rx * rx + ry * ry;
-      if (d < md) {
-        md = d;
-        mg = [nx + i, ny + j];
-        mr = [rx, ry];
-      }
-    }
-  }
-  let be = 1e9;
-  let nb = mg;
-  for (let j = -1; j <= 1; j++) {
-    for (let i = -1; i <= 1; i++) {
-      if (i === 0 && j === 0) continue;
-      const s = cellSeed(mg[0] + i, mg[1] + j);
-      const rx = s[0] - wx;
-      const ry = s[1] - wy;
-      const dx = rx - mr[0];
-      const dy = ry - mr[1];
-      const l = Math.hypot(dx, dy);
-      if (l < 1e-3) continue;
-      const d = (0.5 * (mr[0] + rx) * dx + 0.5 * (mr[1] + ry) * dy) / l;
-      if (d < be) {
-        be = d;
-        nb = [mg[0] + i, mg[1] + j];
-      }
-    }
-  }
-  return { cell: mg, edge: be, nb };
-}
-
-export function cellAtRef(qx, qy) {
-  const w = warpXY(qx, qy);
-  return voronoi(w[0], w[1]);
 }

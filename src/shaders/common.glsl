@@ -7,8 +7,6 @@
 const float BAR_BOTTOM = -4.8;
 const float BAR_HEIGHT = 9.6;
 const float SHELL_T = 0.13;      // chocolate shell thickness (1.3 mm)
-const float CELL = 1.18;         // fracture cell size
-const float JIT = 0.72;
 
 const float STICK_HW = 0.47;     // half width
 const float STICK_HT = 0.1;      // half thickness

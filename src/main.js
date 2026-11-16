@@ -192,12 +192,15 @@ function onDown(e) {
     return;
   }
   if (hit.onBody) {
-    const res = fracture.impact(hit, state.time, hit.M, world);
+    const res = fracture.press(hit, state.time, hit.M, world);
     if (res) {
       const pan = (e.clientX / window.innerWidth) * 2 - 1;
-      audio.crack(res.type, pan, res.strength);
-      state.shake = res.type === "pop" ? 1 : res.type === "crack" ? 0.7 : 0.3;
-      if (navigator.vibrate) navigator.vibrate(res.type === "pop" ? 14 : 8);
+      pointer.press = res.impact;
+      pointer.pan = pan;
+      pointer.slop = 14; // a finger wobbles; don't start turning the bar too eagerly
+      audio.crack(res.type === "crunch" ? "pop" : "crack", pan, res.type === "crunch" ? 1 : 0.85);
+      state.shake = res.type === "crunch" ? 0.9 : 0.6;
+      if (navigator.vibrate) navigator.vibrate(res.type === "crunch" ? 14 : 9);
       canvas.classList.add("has-cracked");
       revealReset();
     }
@@ -210,7 +213,10 @@ function onMove(e) {
     const dy = e.clientY - pointer.y;
     pointer.x = e.clientX;
     pointer.y = e.clientY;
-    if (Math.hypot(e.clientX - pointer.sx, e.clientY - pointer.sy) > 4) pointer.moved = true;
+    if (Math.hypot(e.clientX - pointer.sx, e.clientY - pointer.sy) > (pointer.slop || 4)) {
+      pointer.moved = true;
+      pointer.press = null;
+    }
     if (pointer.moved) {
       state.yaw += dx * 0.0085;
       state.pitch = Math.max(-0.32, Math.min(0.32, state.pitch + dy * 0.0045));
@@ -361,6 +367,12 @@ function frame(now) {
 
   if (!renderer || !renderer.u) return;
 
+  // holding a press pushes deeper, with a crackle as the cracks creep
+  if (pointer && pointer.press && fracture.hold(pointer.press, dt)) {
+    audio.crackle(pointer.pan, pointer.press.strength);
+    state.shake = Math.max(state.shake, 0.25);
+    if (navigator.vibrate) navigator.vibrate(4);
+  }
   fracture.update(dt, state.time, rate, M, world, cam.floorY);
   if (fracture.texDirty) {
     renderer.uploadCells(fracture.data);
@@ -398,9 +410,8 @@ function frame(now) {
       boundMin: b.min,
       boundMax: b.max,
       melt: M,
-      cracks: fracture.any,
+      impacts: fracture.impacts.length,
       primCount: liq.count,
-      fragCount: fr.frags,
       crumbCount: fr.crumbs,
       liqMin: liq.count ? liq.min : [0, 0, 0],
       liqMax: liq.count ? liq.max : [0, 0, 0],

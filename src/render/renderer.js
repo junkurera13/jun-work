@@ -198,9 +198,8 @@ export class Renderer {
     gl.uniform1f(u.uChocGone, M.chocGone);
     gl.uniform1f(u.uStickK, M.stickK);
     gl.uniform1f(u.uWet, M.wet);
-    gl.uniform1f(u.uCracks, U.cracks ? 1 : 0);
+    gl.uniform1i(u.uImpactCount, U.impacts);
     gl.uniform1i(u.uPrimCount, U.primCount);
-    gl.uniform1i(u.uFragCount, U.fragCount);
     gl.uniform1i(u.uCrumbCount, U.crumbCount);
     gl.uniform3fv(u.uLiqMin, U.liqMin);
     gl.uniform3fv(u.uLiqMax, U.liqMax);

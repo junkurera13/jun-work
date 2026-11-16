@@ -29,13 +29,12 @@ uniform float uStickK;
 uniform float uWet;
 
 // fracture
-uniform float uCracks;
+uniform int uImpactCount;
 uniform sampler2D uCellTex;
 
 // dynamic objects
 uniform sampler2D uDyn;
 uniform int uPrimCount;
-uniform int uFragCount;
 uniform int uCrumbCount;
 uniform vec3 uLiqMin;
 uniform vec3 uLiqMax;
@@ -48,7 +47,7 @@ uniform float uExposure;
 const float TEXT_Y0 = -4.4;
 const float TEXT_Y1 = 1.72;
 const int MAX_PRIMS = 64;
-const int MAX_FRAGS = 12;
+const int MAX_IMPACTS = 16;
 const int MAX_CRUMBS = 24;
 
 struct Parts {
@@ -95,76 +94,111 @@ float bodyOuter(vec3 p, out vec3 q, out float hn) {
   return d / uSag * (1.0 - 0.95 * uTaper) * (1.0 - uShrink);
 }
 
-vec2 cellSeed(vec2 g) {
-  return (g + 0.5 + (hash22(g + 17.0) - 0.5) * JIT) * CELL;
+float wrapAngle(float a) {
+  return a - 6.2831853 * floor((a + 3.14159265) / 6.2831853);
 }
 
-vec2 warpXY(vec2 p) {
-  return p + 0.2 * vec2(vnoise2(p * 1.6) - 0.5, vnoise2(p * 1.6 + 31.7) - 0.5)
-           + 0.05 * vec2(vnoise2(p * 6.1 + 4.0) - 0.5, vnoise2(p * 6.1 + 13.1) - 0.5);
-}
-
-// returns (border distance, nearest cell); nb = neighbour across that border
-vec3 voronoi(vec2 x, out vec2 nb) {
-  vec2 n = floor(x / CELL);
-  vec2 mg = n;
-  vec2 mr = vec2(0.0);
-  float md = 1e9;
-  for (int j = -1; j <= 1; j++) {
-    for (int i = -1; i <= 1; i++) {
-      vec2 g = n + vec2(float(i), float(j));
-      vec2 r = cellSeed(g) - x;
-      float d = dot(r, r);
-      if (d < md) { md = d; mr = r; mg = g; }
-    }
-  }
-  md = 1e9;
-  nb = mg;
-  for (int j = -1; j <= 1; j++) {
-    for (int i = -1; i <= 1; i++) {
-      if (i == 0 && j == 0) continue;
-      vec2 g = mg + vec2(float(i), float(j));
-      vec2 r = cellSeed(g) - x;
-      vec2 dr = r - mr;
-      if (dot(dr, dr) < 1e-6) continue;
-      float d = dot(0.5 * (mr + r), normalize(dr));
-      if (d < md) { md = d; nb = g; }
-    }
-  }
-  return vec3(md, mg);
-}
-
-vec4 cellState(vec2 g, float face) {
-  ivec2 t = ivec2(int(g.x) + 4 + int(face) * 8, int(g.y) + 6);
-  if (t.x < int(face) * 8 || t.x > int(face) * 8 + 7 || t.y < 0 || t.y > 11) return vec4(0.0);
-  return texelFetch(uCellTex, t, 0);
-}
-
-// void field of the shell: negative inside crack grooves and removed holes
-float crackVoid(vec3 q, out vec4 st, out float edge) {
-  vec2 w = warpXY(q.xy);
-  vec2 nb;
-  vec3 v = voronoi(w, nb);
-  float face = q.z >= 0.0 ? 0.0 : 1.0;
-  vec4 s1 = cellState(v.yz, face);
-  vec4 s2 = cellState(nb, face);
-  float e = v.x;
-  float seam = abs(q.z);
-  if (seam < e) { e = seam; s2 = cellState(v.yz, 1.0 - face); }
-  st = s1;
-  edge = e;
-  if (s1.x + s2.x + s1.y + s2.y <= 0.0) return 1.0;
-  // as the shell softens the cracks smear closed again
+// Impact cracks. Every press leaves: a shallow crater, a handful of jagged
+// cracks radiating from the press point (tapering as they run out), partial
+// ring cracks around it, the plates in between pushed into the soft ice cream
+// at slightly different angles, vanilla squeezed up through the gaps and,
+// after hard presses, a crushed hole in the middle.
+// Returns the groove field (negative inside a crack or hole).
+float crackField(vec3 q, out float sink, out float fill, out float inHole, out float holeEdge) {
+  sink = 0.0;
+  fill = 0.0;
+  inHole = 0.0;
+  holeEdge = 1e5;
+  float vd = 1e5;
   float heal = 1.0 - smoothstep(0.45, 0.85, uMeltC);
-  s1.xzw *= heal;
-  s2.xzw *= heal;
-  st = s1;
-  float jag = vnoise2(q.xy * 13.0 + face * 7.0);
-  if (s1.y > 0.5) return -(e - 0.014 * jag);
-  if (s2.y > 0.5) return e + 0.014 * jag;
-  float o = 0.62 * min(s1.x, s2.x) + 0.38 * max(s1.x, s2.x);
-  float wdt = 0.046 * o * (0.4 + 1.2 * jag);
-  return e - wdt;
+  float jag = vnoise2(q.xy * 14.0);
+  float jag2 = vnoise2(q.xy * 37.0 + 5.0);
+  for (int i = 0; i < MAX_IMPACTS; i++) {
+    if (i >= uImpactCount) break;
+    vec4 A = texelFetch(uCellTex, ivec2(i, 0), 0);  // x, y, face, radius
+    float R = A.w;
+    if (R < 0.01) continue;
+    if (q.z * A.z < -0.3) continue;                 // other face of the bar
+    vec2 dv = q.xy - A.xy;
+    float r = length(dv);
+    if (r > R * 1.08) continue;
+    vec4 B = texelFetch(uCellTex, ivec2(i, 1), 0);  // depth, seed, hole, fill
+    vec4 C = texelFetch(uCellTex, ivec2(i, 2), 0);  // strength
+    float seed = B.y;
+    float th = atan(dv.y, dv.x);
+    // cracks wander as they run outwards
+    float thw = th + 0.32 * (vnoise2(vec2(r * 3.0 + seed * 3.0, seed * 9.0)) - 0.5)
+                   + 0.1 * (vnoise2(vec2(r * 9.0 + seed, seed * 2.0)) - 0.5) + 0.04 * (jag - 0.5);
+    float K = floor(5.0 + hash12(vec2(seed * 3.7, 1.3)) * 3.0);
+    float sw = 6.2831853 / K;
+    float sIdx = floor((thw + 3.14159265) / sw);
+    float best = 1e5;
+    float plate = 0.0;
+    float bestSigned = 1.0;
+    for (int k = -1; k <= 1; k++) {
+      float s = sIdx + float(k);
+      float sm = mod(s, K);
+      float h1 = hash12(vec2(sm * 1.7 + 0.3, seed * 13.1));
+      float h2 = hash12(vec2(sm * 2.3 + 7.0, seed * 5.3));
+      float ang = (s + 0.5 + (h1 - 0.5) * 0.75) * sw - 3.14159265;
+      float L = R * (0.45 + 0.55 * h2);
+      float da = wrapAngle(thw - ang);
+      float ada = min(abs(da), 1.5707);
+      float lat = r * sin(ada);
+      float along = r * cos(ada);
+      float dist = along < L ? lat : length(vec2(along - L, lat));
+      float w = 0.034 * pow(clamp(1.0 - r / L, 0.0, 1.0), 0.65) * min(1.0, C.x * 1.6);
+      float g = dist - w * (0.45 + 1.1 * jag) - 0.004 * jag2;
+      if (g < best) {
+        best = g;
+        bestSigned = da;
+        plate = mod(da > 0.0 ? sm : sm - 1.0, K);
+      }
+    }
+    // partial, wobbly ring cracks join neighbouring spokes into plates
+    float zone = 0.0;      // which ring band of this plate we are in (only real cracks count)
+    float zoneR0 = 0.0;    // inner radius of that band
+    float rings = 0.0;
+    vec2 cs = vec2(cos(th), sin(th));
+    for (int j = 0; j < 2; j++) {
+      float fj = float(j);
+      float rho = R * (fj < 0.5 ? 0.3 + 0.1 * hash12(vec2(seed, 3.0)) : 0.6 + 0.12 * hash12(vec2(seed, 4.0)));
+      rho *= 1.0 + 0.42 * (vnoise2(cs * 1.9 + vec2(seed * 3.1, fj * 7.0)) - 0.5) + 0.1 * (vnoise2(cs * 6.0 + seed) - 0.5);
+      bool present = hash12(vec2(plate * 3.1 + fj * 17.0, seed * 7.7)) < (fj < 0.5 ? 0.7 : 0.45)
+                     && C.x > 0.3 + 0.3 * fj;
+      if (!present) continue;
+      rings += 1.0;
+      if (r > rho) { zone += 1.0; zoneR0 = rho; }
+      float w = 0.024 * (1.0 - rho / R) * min(1.0, C.x);
+      float g = abs(r - rho) - w * (0.4 + 1.2 * jag) - 0.004 * jag2;
+      best = min(best, g);
+    }
+    // each broken plate is pushed into the soft ice cream as a whole,
+    // hinged at its outer end, by its own amount: steps appear at the cracks
+    float pf = 0.6 + 0.8 * hash12(vec2(plate * 5.3 + zone * 1.9, seed * 2.9));
+    // plates fully enclosed by cracks drop in as a block (a step at every
+    // crack); the open outer band only tilts, easing back to intact shell
+    float sk;
+    if (rings > zone + 0.5) {
+      sk = B.x * pf * (1.0 - 0.35 * r / R);
+    } else {
+      sk = B.x * pf * (zone < 0.5 ? 0.8 : 0.5) * (1.0 - smoothstep(zoneR0, zoneR0 + 0.45 * R, r));
+    }
+    sk *= heal;
+    sink = max(sink, sk);
+    // vanilla squeezed up through the gaps, strongest near the press
+    fill = max(fill, B.w * (1.0 - 0.75 * smoothstep(0.2 * R, R, r)) * heal);
+    vd = min(vd, best + (1.0 - heal) * 0.05);
+    // crushed centre
+    float hr = B.z * (0.7 + 0.6 * vnoise2(cs * 2.0 + seed * 4.0));
+    if (hr > 0.0) {
+      float he = hr - r;
+      holeEdge = min(holeEdge, -he);
+      if (he > 0.0) inHole = 1.0;
+      vd = min(vd, -he + 0.01 * jag);
+    }
+  }
+  return vd;
 }
 
 void bodyEval(vec3 p, inout Parts P) {
@@ -177,22 +211,22 @@ void bodyEval(vec3 p, inout Parts P) {
   float tcE = SHELL_T * (1.0 - 0.6 * uMeltC);
   float dCore = dO + tcE;
   float dShell = dO;
-  if (uCracks > 0.5 && dO < 0.35 && dO > -0.6) {
-    vec4 st;
-    float edge;
-    float vd = crackVoid(q, st, edge);
-    dShell = max(dO + st.z, -vd);
-    P.sink = st.z;
-    float fill = st.w;
+  if (uImpactCount > 0 && dO < 0.35 && dO > -0.6) {
+    float sink, fill, inHole, holeEdge;
+    float vd = crackField(q, sink, fill, inHole, holeEdge);
+    // the press pushes shell and ice cream in together
+    dShell = max(dO + sink, -vd);
+    dCore += sink;
+    P.sink = sink;
     P.fill = fill;
-    P.hole = st.y;
-    if (st.y > 0.5) {
-      // exposed vanilla in an open hole softens and slumps
-      dCore += 0.22 * uMeltV * smoothstep(0.0, 0.6, edge);
+    P.hole = inHole;
+    if (inHole > 0.5) {
+      // exposed vanilla in a crushed hole softens and slumps
+      dCore += 0.2 * uMeltV * smoothstep(0.0, 0.4, -holeEdge);
     }
     if (fill > 0.0) {
-      float dFill = max(dO + tcE * (1.0 - fill) - 0.03 * fill * fill, vd - 0.022 * fill);
-      dCore = smin(dCore, dFill, 0.035);
+      float dFill = max(dO + sink + tcE * (1.0 - fill) - 0.028 * fill * fill, vd - 0.02 * fill);
+      dCore = smin(dCore, dFill, 0.03);
     }
   }
   if (uChocGone > 0.0) {
@@ -252,47 +286,6 @@ float liquid(vec3 p, bool full, out float chocW) {
   return d;
 }
 
-// ------------------------------------------------------------ fragments ---
-
-float fragments(vec3 p, bool full, out float side) {
-  side = 0.0;
-  float d = 1e5;
-  for (int i = 0; i < MAX_FRAGS; i++) {
-    if (i >= uFragCount) break;
-    vec4 pos = texelFetch(uDyn, ivec2(i, 6), 0);
-    vec3 rp = p - pos.xyz;
-    float bs = length(rp) - pos.w;
-    if (bs > 0.04) { d = min(d, bs); continue; }
-    vec4 c0 = texelFetch(uDyn, ivec2(i, 3), 0);
-    vec4 c1 = texelFetch(uDyn, ivec2(i, 4), 0);
-    vec4 c2 = texelFetch(uDyn, ivec2(i, 5), 0);
-    vec4 rf = texelFetch(uDyn, ivec2(i, 7), 0);
-    vec4 ex = texelFetch(uDyn, ivec2(i, 8), 0);
-    mat3 R = mat3(c0.xyz, c1.xyz, c2.xyz);
-    vec3 lp = transpose(R) * rp + rf.xyz;
-    float hn;
-    vec4 ex2 = texelFetch(uDyn, ivec2(i, 11), 0);
-    vec3 q = deformRef(lp, rf.w, ex.x, ex.w, ex2.y, hn);
-    float morph = ex2.x;
-    float dO = (sdMelting(q, morph) + ex.y * (0.5 + 0.5 * hn)) / rf.w;
-    float t = SHELL_T * (1.0 - 0.6 * ex.z);
-    float band = max(dO - 0.003, -(dO + t));
-    vec2 nb;
-    vec3 v = voronoi(warpXY(q.xy), nb);
-    float face = c2.w;
-    bool inCell = all(equal(v.yz, vec2(c0.w, c1.w))) && ((q.z >= 0.0) == (face < 0.5));
-    float e = min(v.x, abs(q.z));
-    float jag = vnoise2(q.xy * 13.0 + face * 7.0);
-    float reg = inCell ? -(e - 0.014 * jag) : e + 0.01;
-    float df = max(band, reg);
-    if (df < d) {
-      d = df;
-      if (full) side = (dO > -0.022) ? 0.0 : (dO < -t + 0.022 ? 2.0 : 1.0);
-    }
-  }
-  return d;
-}
-
 vec3 qrot(vec4 q, vec3 v) {
   return v + 2.0 * cross(q.xyz, cross(q.xyz, v) + q.w * v);
 }
@@ -338,10 +331,6 @@ float scene(vec3 p, bool full, out Parts P) {
   }
   P.liq = liquid(p, full, P.liqC);
   d = smin(d, P.liq, 0.13);
-  if (uFragCount > 0) {
-    P.frag = fragments(p, full, P.fragSide);
-    d = min(d, P.frag);
-  }
   if (uCrumbCount > 0) {
     P.crumb = crumbs(p);
     d = min(d, P.crumb);
