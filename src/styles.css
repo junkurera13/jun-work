@@ -230,6 +230,24 @@ body {
   }
 }
 
+/* the plus circle at the end of the row */
+.dock-add .dock-icon {
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 2px 5px -1px rgba(50, 30, 20, 0.2), inset 0 0 0 1px rgba(95, 90, 85, 0.16);
+}
+.dock-add svg {
+  width: 62%;
+  height: 62%;
+  fill: none;
+  stroke: #6a645e;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+.dock-add:focus-visible .dock-icon {
+  box-shadow: 0 2px 5px -1px rgba(50, 30, 20, 0.2), inset 0 0 0 1px rgba(95, 90, 85, 0.16), 0 0 0 2px #9ec3e6;
+}
 .dock-item:focus-visible {
   outline: none;
 }

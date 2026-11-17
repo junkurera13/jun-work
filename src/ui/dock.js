@@ -5,7 +5,7 @@
  * move between them.
  */
 export class Dock {
-  constructor(root, { items, value = 0, onChange }) {
+  constructor(root, { items, value = 0, onChange, onAdd }) {
     this.root = root;
     this.onChange = onChange;
 
@@ -33,6 +33,18 @@ export class Dock {
       root.appendChild(b);
       return b;
     });
+
+    // a plus circle at the end of the row: make a new ice cream (not wired
+    // up to anything yet)
+    this.addButton = document.createElement("button");
+    this.addButton.type = "button";
+    this.addButton.className = "dock-item dock-add";
+    this.addButton.setAttribute("aria-label", "create your own ice cream");
+    this.addButton.innerHTML =
+      `<span class="dock-label" aria-hidden="true">create your own</span>` +
+      `<span class="dock-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7v10M7 12h10" /></svg></span>`;
+    this.addButton.addEventListener("click", () => onAdd?.());
+    root.appendChild(this.addButton);
 
     this.set(value, false);
   }
