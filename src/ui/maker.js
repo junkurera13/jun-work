@@ -45,7 +45,7 @@ export const CORES = [
   { id: 3, name: "mint choc chip", dot: "#cfe2a8" },
   { id: 7, name: "matcha", dot: "#a7bb73" },
   { id: 8, name: "mango sorbet", dot: "#f7a432", icy: true },
-  { id: 4, name: "rose", dot: "#e0396a", icy: true },
+  { id: 4, name: "faluda", dot: "#e0396a", icy: true },
   { id: 5, name: "passionfruit coconut", dot: "linear-gradient(180deg, #f6b71f 45%, #f6f4ee 46%)", icy: true },
 ];
 

@@ -12,8 +12,8 @@ crusted with chopped cookie round the bottom. Like the strawberry one, it dents 
 
 The **+** at the end of the row opens a maker with a live, turning preview: pick a shape (bar, lolly, grooved,
 wedge, tube), a coating (dark, milk, white or ruby choc, caramel, matcha choc, or none) and one of ten flavours
-(vanilla, chocolate, cookies & cream, strawberry milk, blueberry yoghurt, mint choc chip, matcha, mango sorbet, rose,
-passionfruit coconut). Coated ones crack like the Magic Choc; uncoated creamy ones dent; uncoated mango, rose and
+(vanilla, chocolate, cookies & cream, strawberry milk, blueberry yoghurt, mint choc chip, matcha, mango sorbet, faluda,
+passionfruit coconut). Coated ones crack like the Magic Choc; uncoated creamy ones dent; uncoated mango, faluda and
 passionfruit coconut crack like ice. What you make is remembered in that browser (`src/ui/maker.js`).
 Use the flavor buttons below the scene to switch between them.
 
