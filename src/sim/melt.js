@@ -13,9 +13,9 @@ export function meltParams(P, flavor = {}) {
   const faluda = !!flavor.faluda;
   const mould = flavor.mould ?? 0;
   const white = !!flavor.white;
-  // an ice cream the visitor made: { coat: 0 dark | 1 white | 2 none, core }
+  // an ice cream the visitor made: { coat: a coating (or null), core }
   const custom = flavor.custom ?? null;
-  const coated = !!custom && custom.coat < 2;
+  const coated = !!custom?.coat;
   // the coconut, strawberry milk and mint lollies (and uncoated ones you make)
   // are one solid ice all the way through
   const solid = custom ? !coated : mould > 0;

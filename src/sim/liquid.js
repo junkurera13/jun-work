@@ -28,7 +28,7 @@ export class Liquid {
     // fixed melt sources for one ice cream (reference space)
     const s = [];
     // a chocolate-coated one drips like the Magic Choc, whatever its shape
-    const iceFirst = this.faluda && !(this.custom && this.custom.coat < 2);
+    const iceFirst = this.faluda && !this.custom?.coat;
     if (iceFirst) {
       // the ice goes first: rose syrup runs off the bottom and down the stick
       // straight away (thin and runny, so it feeds harder); the vanilla only
@@ -74,7 +74,7 @@ export class Liquid {
     // stick; the passionfruit on top (1) runs from the upper faces
     if (!this.custom && this.mould === 1) for (const src of s) src.mat = src.kind === "face" && src.y > 1.6 ? 1 : 0;
     // strawberry milk, mint choc (and uncoated ones you make): all one cream
-    if ((!this.custom && this.mould >= 2) || (this.custom && this.custom.coat === 2)) for (const src of s) src.mat = 0;
+    if ((!this.custom && this.mould >= 2) || (this.custom && !this.custom.coat)) for (const src of s) src.mat = 0;
     // the slim tubes: the melt sources sit closer in
     if (this.mould === 3 || this.mould === 4) for (const src of s) if (src.kind !== "stick") src.x *= 0.5;
     this.sources = s;

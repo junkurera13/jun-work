@@ -300,7 +300,14 @@ export class Renderer {
     gl.uniform1i(u.uMint, !c && M.mould === 3 ? 1 : 0);
     gl.uniform1i(u.uWhite, !c && M.white ? 1 : 0);
     gl.uniform1i(u.uCustom, c ? 1 : 0);
-    gl.uniform1i(u.uCoat, c ? c.coat : 2);
+    // its coating, if it has one: { col, melt, sss, sssCol, gloss } (sRGB)
+    const coat = c?.coat;
+    gl.uniform1i(u.uCoated, coat ? 1 : 0);
+    gl.uniform3fv(u.uCoatCol, coat?.col ?? [0, 0, 0]);
+    gl.uniform3fv(u.uCoatMelt, coat?.melt ?? [0, 0, 0]);
+    gl.uniform1f(u.uCoatSss, coat?.sss ?? 0);
+    gl.uniform3fv(u.uCoatSssCol, coat?.sssCol ?? [0, 0, 0]);
+    gl.uniform1f(u.uCoatGloss, coat?.gloss ?? 1);
     gl.uniform1i(u.uCore, c ? c.core : 0);
     gl.uniform1f(u.uSag, M.sag);
     gl.uniform1f(u.uBulge, M.bulge);

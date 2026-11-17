@@ -361,10 +361,29 @@ const dock = new Dock(dockRoot, {
 });
 
 // "create your own": pick a shape, coating and flavour; it joins the row
+const sceneStill = document.createElement("canvas");
+sceneStill.className = "scene-still";
+sceneStill.hidden = true;
+sceneStill.setAttribute("aria-hidden", "true");
+canvas.after(sceneStill);
+let sceneFrozen = false;
+function freezeScene() {
+  // (called right after a draw, while the WebGL frame is still readable)
+  sceneStill.width = canvas.width;
+  sceneStill.height = canvas.height;
+  sceneStill.getContext("2d").drawImage(canvas, 0, 0);
+  sceneStill.hidden = false;
+  sceneFrozen = true;
+}
 const maker = new Maker({
-  onToggle: (open, returnFocus) => {
+  restYaw: REST_YAW,
+  // the whole ice cream and stick, framed for the preview, turned to yaw
+  renderPreview: (flavor, { yaw, w, h }) =>
+    document.body.classList.contains("is-ready") ? renderView(flavor, { x: 0, y: -2.1, half: 8.6, yaw, w, h }) : null,
+  // (the scene underneath pauses while it's open: frame() checks maker.open)
+  onToggle: (open) => {
     dock.setExpanded(open);
-    if (returnFocus) dock.addButton.focus();
+    if (!open) sceneFrozen = false;
   },
   onMake: (recipe) => {
     recipes.push(recipe);
@@ -382,21 +401,35 @@ const maker = new Maker({
 // a close-up of the front of the bar, turned and lit just like the big one,
 // so it shows the real thing (the gloss streak on the chocolate, the frost on
 // the rose ice). The page crops it to a circle.
-function renderSwatch(flavor, { x, y, half, peel = false, asBar = false }) {
+function renderSwatch(flavor, swatch) {
+  const px = 96;
+  const ss = 2; // supersampled, then scaled down for smooth edges
+  const img = renderView(flavor, { ...swatch, w: px * ss, h: px * ss });
+  const out = document.createElement("canvas");
+  out.width = px;
+  out.height = px;
+  const g = out.getContext("2d");
+  g.imageSmoothingQuality = "high";
+  g.drawImage(img, 0, 0, px, px);
+  return out.toDataURL("image/png");
+}
+
+// Render an ice cream offscreen, lit like the big one, on a transparent
+// background: a window of half-height `half` cm centred on (x, y) on its
+// front, turned to `yaw`. Returns a canvas w x h.
+function renderView(flavor, { x, y, half, peel = false, asBar = false, yaw = REST_YAW, w, h }) {
   // asBar: draw it on the Magic Choc bar's shape (whose framing keeps clear of
   // the studio reflection), for coated ice creams you make
   if (asBar) flavor = { ...flavor, faluda: false, mould: 0 };
-  const px = 96;
-  const ss = 2; // supersampled, then scaled down for smooth edges
   const tan = 0.05;
   const D = half / tan;
-  const rot = mat3FromQuat(quatFromAxisAngle(0, 1, 0, REST_YAW));
+  const rot = mat3FromQuat(quatFromAxisAngle(0, 1, 0, yaw));
   const look = mulMat3(rot, x, y, 0);
   const camObj = mulMat3T(rot, look.x, look.y, D);
   const ro = mulMat3T(rot, 1, 0, 0);
   const uo = mulMat3T(rot, 0, 1, 0);
   const fo = mulMat3T(rot, 0, 0, -1);
-  const img = renderer.thumbnail(
+  return renderer.thumbnail(
     {
       camPos: camObj,
       camBasis: [ro.x, ro.y, ro.z, uo.x, uo.y, uo.z, fo.x, fo.y, fo.z],
@@ -419,16 +452,9 @@ function renderSwatch(flavor, { x, y, half, peel = false, asBar = false }) {
       weatherB: 0,
       lightTint: [1, 1, 1],
     },
-    px * ss,
-    px * ss,
+    w,
+    h,
   );
-  const out = document.createElement("canvas");
-  out.width = px;
-  out.height = px;
-  const g = out.getContext("2d");
-  g.imageSmoothingQuality = "high";
-  g.drawImage(img, 0, 0, px, px);
-  return out.toDataURL("image/png");
 }
 
 function renderOrbs() {
@@ -491,6 +517,10 @@ function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.05, Math.max(0, (now - last) / 1000));
   last = now;
+  // while you're making an ice cream the scene underneath holds still (a
+  // copy of its last frame stands in: the preview shares the GL context, and
+  // the live canvas would be wiped)
+  if (maker.open && sceneFrozen) return;
   state.time += dt;
 
   // the weather washes in over ~1.5 s; speed, sky and light all follow it
@@ -578,6 +608,8 @@ function frame(now) {
     },
     scissorFor(b),
   );
+  if (maker.open && !sceneFrozen) freezeScene();
+  else if (!maker.open && !sceneStill.hidden) sceneStill.hidden = true;
 
   const ft = now - lastFrameStart;
   lastFrameStart = now;

@@ -10,10 +10,11 @@ creamy white rippled with purple compote and blueberry pieces.
 And a mint choc pop: a slim cylinder of soft mint cream with chocolate chips, dusted with cookie crumbs and
 crusted with chopped cookie round the bottom. Like the strawberry one, it dents instead of cracking.
 
-The **+** at the end of the row makes your own: pick a shape (bar, lolly, grooved, wedge, tube), a coating
-(dark choc, white choc or none) and a flavour (vanilla, blueberry, strawberry milk, mint choc, rose, passionfruit
-coconut). Coated ones crack like the Magic Choc; uncoated creamy ones dent; uncoated rose and passionfruit coconut
-crack like ice. What you make is remembered in that browser (`src/ui/maker.js`).
+The **+** at the end of the row opens a maker with a live, turning preview: pick a shape (bar, lolly, grooved,
+wedge, tube), a coating (dark, milk, white or ruby choc, caramel, matcha choc, or none) and one of ten flavours
+(vanilla, chocolate, cookies & cream, strawberry milk, blueberry yoghurt, mint choc chip, matcha, mango sorbet, rose,
+passionfruit coconut). Coated ones crack like the Magic Choc; uncoated creamy ones dent; uncoated mango, rose and
+passionfruit coconut crack like ice. What you make is remembered in that browser (`src/ui/maker.js`).
 Use the flavor buttons below the scene to switch between them.
 
 - **Tap / click** the shell to break it: a patch around your finger snaps into
