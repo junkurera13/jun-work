@@ -291,10 +291,17 @@ export class Renderer {
     gl.uniform3fv(u.uBoundMax, U.boundMax);
     const M = U.melt;
     gl.uniform1i(u.uFaluda, M.faluda ? 1 : 0);
-    gl.uniform1i(u.uCoco, M.mould === 1 ? 1 : 0);
-    gl.uniform1i(u.uBerry, M.mould === 2 ? 1 : 0);
-    gl.uniform1i(u.uMint, M.mould === 3 ? 1 : 0);
-    gl.uniform1i(u.uWhite, M.white ? 1 : 0);
+    // the mould is the shape; the flavour switches below are only for the
+    // ready-made ice creams (one you make picks its coating and flavour)
+    const c = M.custom;
+    gl.uniform1i(u.uMould, M.mould ?? 0);
+    gl.uniform1i(u.uCoco, !c && M.mould === 1 ? 1 : 0);
+    gl.uniform1i(u.uBerry, !c && M.mould === 2 ? 1 : 0);
+    gl.uniform1i(u.uMint, !c && M.mould === 3 ? 1 : 0);
+    gl.uniform1i(u.uWhite, !c && M.white ? 1 : 0);
+    gl.uniform1i(u.uCustom, c ? 1 : 0);
+    gl.uniform1i(u.uCoat, c ? c.coat : 2);
+    gl.uniform1i(u.uCore, c ? c.core : 0);
     gl.uniform1f(u.uSag, M.sag);
     gl.uniform1f(u.uBulge, M.bulge);
     gl.uniform1f(u.uTaper, M.taper);

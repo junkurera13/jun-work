@@ -15,9 +15,10 @@ export class Liquid {
     this.reset();
   }
 
-  reset(faluda = false, mould = 0) {
+  reset(faluda = false, mould = 0, custom = null) {
     this.faluda = faluda;
     this.mould = mould;
+    this.custom = custom;
     this.streams = new Map();
     this.falling = [];
     this.seed();
@@ -26,7 +27,9 @@ export class Liquid {
   seed() {
     // fixed melt sources for one ice cream (reference space)
     const s = [];
-    if (this.faluda) {
+    // a chocolate-coated one drips like the Magic Choc, whatever its shape
+    const iceFirst = this.faluda && !(this.custom && this.custom.coat < 2);
+    if (iceFirst) {
       // the ice goes first: rose syrup runs off the bottom and down the stick
       // straight away (thin and runny, so it feeds harder); the vanilla only
       // follows once the ice round it has gone
@@ -63,17 +66,17 @@ export class Liquid {
         x: rand(-1.4, 1.4),
         y: 4.9,
         side: i % 2 === 0 ? 1 : -1,
-        from: (this.faluda ? 0.55 : 0.36) + i * 0.08,
+        from: (iceFirst ? 0.55 : 0.36) + i * 0.08,
         feed: (M) => 0.5 + 0.8 * M.meltV,
       });
     }
     // passionfruit coconut: coconut milk (0) runs off the bottom and down the
     // stick; the passionfruit on top (1) runs from the upper faces
-    if (this.mould === 1) for (const src of s) src.mat = src.kind === "face" && src.y > 1.6 ? 1 : 0;
-    // strawberry milk, mint choc: it's all the one cream
-    if (this.mould >= 2) for (const src of s) src.mat = 0;
-    // mint choc: a slim tube, so the melt sources sit closer in
-    if (this.mould === 3) for (const src of s) if (src.kind !== "stick") src.x *= 0.5;
+    if (!this.custom && this.mould === 1) for (const src of s) src.mat = src.kind === "face" && src.y > 1.6 ? 1 : 0;
+    // strawberry milk, mint choc (and uncoated ones you make): all one cream
+    if ((!this.custom && this.mould >= 2) || (this.custom && this.custom.coat === 2)) for (const src of s) src.mat = 0;
+    // the slim tubes: the melt sources sit closer in
+    if (this.mould === 3 || this.mould === 4) for (const src of s) if (src.kind !== "stick") src.x *= 0.5;
     this.sources = s;
   }
 

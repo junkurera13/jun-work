@@ -138,6 +138,7 @@ const int MOULD_FALUDA = 0;  // soft pillow, almost-round top
 const int MOULD_COCO = 1;    // boxier, two grooves down each face
 const int MOULD_BERRY = 2;   // tapered wedge: wide at the stick, narrowing to the tip
 const int MOULD_MINT = 3;    // a thin cylinder, its bottom end crusted with cookie crumbs
+const int MOULD_TUBE = 4;    // the same cylinder, plain (for ice creams you make yourself)
 
 // Mint choc mould: a slim round tube with softly rounded ends.
 const float MINT_R = 1.38;   // radius
@@ -225,6 +226,7 @@ float cocoGrooves(vec2 p) {
 // over into the sides with a big soft radius (no flat bevel ledge).
 float sdFaluda(vec3 p, int mould) {
   if (mould == MOULD_MINT) return (sdMintTube(p) - mintCrust(p)) * 0.85;
+  if (mould == MOULD_TUBE) return sdMintTube(p) * 0.85;
   float o = faludaOutline(p.xy, mould);
   if (mould == MOULD_BERRY) {
     // each face rises gently to a soft ridge down the middle
@@ -266,6 +268,6 @@ float sdBlobSlim(vec3 p) {
 float sdMelting(vec3 q, float morph, bool faluda, int mould) {
   float a = faluda ? sdFaluda(q, mould) : sdBar(q);
   if (morph <= 0.0) return a;
-  return mix(a, faluda && mould == MOULD_MINT ? sdBlobSlim(q) : sdBlob(q), morph);
+  return mix(a, faluda && (mould == MOULD_MINT || mould == MOULD_TUBE) ? sdBlobSlim(q) : sdBlob(q), morph);
 }
 

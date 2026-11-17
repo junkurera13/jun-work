@@ -9,9 +9,18 @@ export const MELT_SECONDS = 540;
  * Magic Choc: the vanilla inside starts going first; the chocolate shell follows
  * a little behind. Faluda: the rose ice runs first and the vanilla holds on.
  */
-export function meltParams(P, faluda = false, mould = 0, white = false) {
-  // the coconut and strawberry milk lollies are one solid ice all the way through
-  const solid = mould > 0;
+export function meltParams(P, flavor = {}) {
+  const faluda = !!flavor.faluda;
+  const mould = flavor.mould ?? 0;
+  const white = !!flavor.white;
+  // an ice cream the visitor made: { coat: 0 dark | 1 white | 2 none, core }
+  const custom = flavor.custom ?? null;
+  const coated = !!custom && custom.coat < 2;
+  // the coconut, strawberry milk and mint lollies (and uncoated ones you make)
+  // are one solid ice all the way through
+  const solid = custom ? !coated : mould > 0;
+  // a coated one melts like the Magic Choc, whatever its shape
+  const iceFirst = faluda && !coated;
   const f = Math.pow(smoothstep(0.08, 1.0, P), 1.25);
   // the top slumps, but never squashes flat: the last of the ice cream stays
   // a rounded lump that shrinks onto the stick and melts away
@@ -22,6 +31,7 @@ export function meltParams(P, faluda = false, mould = 0, white = false) {
     P,
     faluda,
     mould,
+    custom,
     // white chocolate shell over blueberry yoghurt (the Magic Choc bar shape)
     white,
     sag,
@@ -35,10 +45,10 @@ export function meltParams(P, faluda = false, mould = 0, white = false) {
     // air first and turns straight into runny syrup; the vanilla inside is
     // insulated by it and its fat and air hold their shape for longer.
     // Passionfruit coconut, strawberry milk: solid, so inside and out go together.
-    meltV: solid ? smoothstep(0.0, 0.7, P) : faluda ? smoothstep(0.2, 0.95, P) : smoothstep(0.0, 0.8, P),
-    meltC: faluda ? smoothstep(0.0, 0.7, P) : smoothstep(0.12, 0.92, P),
+    meltV: solid ? smoothstep(0.0, 0.7, P) : iceFirst ? smoothstep(0.2, 0.95, P) : smoothstep(0.0, 0.8, P),
+    meltC: iceFirst ? smoothstep(0.0, 0.7, P) : smoothstep(0.12, 0.92, P),
     // (solid ice has no separate shell to melt off: it just erodes)
-    chocGone: solid ? 0 : faluda ? 1.1 * smoothstep(0.26, 0.86, P) : 1.1 * smoothstep(0.38, 1.0, P),
+    chocGone: solid ? 0 : iceFirst ? 1.1 * smoothstep(0.26, 0.86, P) : 1.1 * smoothstep(0.38, 1.0, P),
     stickK: 0.16 * smoothstep(0.3, 0.6, P) * (1 - smoothstep(0.96, 1.0, P)),
     wet: smoothstep(0.4, 0.75, P),
   };

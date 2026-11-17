@@ -14,6 +14,10 @@ uniform float uTime;
 uniform bool uFaluda;
 uniform bool uCoco;      // passionfruit coconut: grooved lolly mould, coconut ice under passionfruit
 uniform bool uWhite;     // white chocolate shell over blueberry yoghurt ice cream (Magic Choc shape)
+uniform int uMould;      // which lolly mould (shape only; see MOULD_* in common.glsl)
+uniform bool uCustom;    // an ice cream the visitor made: shape + coating + flavour
+uniform int uCoat;       // custom: 0 dark chocolate, 1 white chocolate, 2 none
+uniform int uCore;       // custom: 0 vanilla, 1 blueberry yoghurt, 2 strawberry milk, 3 mint choc, 4 rose ice, 5 passionfruit coconut
 uniform bool uMint;      // mint choc: a slim cylinder of mint cream with cookie crumbs
 uniform bool uBerry;     // strawberry milk: tapered wedge mould, pink milk ice with crushed berries
 uniform bool uThumb;      // picker icon: no backdrop, coverage goes to alpha
@@ -52,9 +56,16 @@ uniform float uExposure;
 #include "common.glsl"
 #include "background.glsl"
 
-int lollyMould() { return uCoco ? MOULD_COCO : (uBerry ? MOULD_BERRY : (uMint ? MOULD_MINT : MOULD_FALUDA)); }
-// the creamy pops (strawberry milk, mint choc) never crack: a press leaves a dent
-bool softLolly() { return uBerry || uMint; }
+int lollyMould() { return uMould; }
+// a made-up ice cream with a chocolate coating
+bool customCoated() { return uCustom && uCoat < 2; }
+// the creamy pops (strawberry milk, mint choc, and uncoated creamy ones you
+// make) never crack: a press leaves a dent
+bool softLolly() { return uBerry || uMint || (uCustom && uCoat == 2 && uCore < 4); }
+// a thick wall of ice that cracks like the faluda's
+bool iceShell() { return uFaluda && !softLolly() && !customCoated(); }
+// passionfruit coconut (its seed sacs bulge)
+bool cocoFlavor() { return uCoco || (uCustom && uCore == 5 && !customCoated()); }
 
 uniform vec3 uLightTint; // the weather tints the light on the ice cream
 
@@ -118,7 +129,7 @@ float bodyOuter(vec3 p, out vec3 q, out float hn) {
 float crackS(vec3 q) {
   float y = q.y;
   // the mint tube is round: just the angle around it
-  if (uMint) return atan(q.x, q.z) / 6.2831853;
+  if (uFaluda && (uMould == MOULD_MINT || uMould == MOULD_TUBE)) return atan(q.x, q.z) / 6.2831853;
   if (uFaluda) {
     float w = lollyHalfWidth(y, lollyMould());
     float th = lollyHalfThick(y, lollyMould());
@@ -216,7 +227,7 @@ void bodyEval(vec3 p, inout Parts P) {
   P.hn = hn;
   P.q = q;
   // the faluda's rose ice is a thick wall round the vanilla, not a thin coat
-  float tcE = uFaluda ? FALUDA_SHELL * (1.0 - 0.8 * uMeltC) : SHELL_T * (1.0 - 0.6 * uMeltC);
+  float tcE = (uFaluda && !customCoated()) ? FALUDA_SHELL * (1.0 - 0.8 * uMeltC) : SHELL_T * (1.0 - 0.6 * uMeltC);
   float dCore = dO + tcE;
   float dShell = dO;
   // by the end the shell has melted away and the cracks fade out with it
@@ -240,7 +251,7 @@ void bodyEval(vec3 p, inout Parts P) {
     vd = mix(0.3, vd, max(crackFade, inHole));
     // the press pushes shell and ice cream in together
     float carve = vd;
-    if (uFaluda) {
+    if (iceShell()) {
       // thick ice: a hairline break only opens a little way in (its pale,
       // frosted floor is what makes ice cracks look white); broken-out
       // pieces and crushed holes go right through to the vanilla
@@ -557,8 +568,13 @@ Mat whiteChocolate(vec3 p, float melt) {
   return m;
 }
 
+Mat darkChocolate(vec3 p, float melt);
 Mat chocolate(vec3 p, float melt) {
-  if (uWhite) return whiteChocolate(p, melt);
+  if (uWhite || (uCustom && uCoat == 1)) return whiteChocolate(p, melt);
+  return darkChocolate(p, melt);
+}
+
+Mat darkChocolate(vec3 p, float melt) {
   Mat m;
   vec3 solid = srgb(vec3(0.275, 0.158, 0.098));
   vec3 soft = srgb(vec3(0.48, 0.3, 0.18));
@@ -874,7 +890,34 @@ Mat mintCream(vec3 p, vec3 q, float melt, bool inner) {
   return m;
 }
 
+Mat vanilla(float melt);
+Mat blueberryYoghurt(vec3 q, float melt);
+
+// The flavour of an ice cream you made, reusing the real ones' materials.
+Mat customCore(vec3 p, vec3 q, vec3 n, float melt, bool inner) {
+  if (uCore == 1) return blueberryYoghurt(q, melt);
+  if (uCore == 2) return berryMilk(p, q, melt, inner);
+  if (uCore == 3) return mintCream(p, q, melt, inner);
+  if (uCore == 4) return faludaIce(p, q, melt);
+  if (uCore == 5) return cocoIce(p, q, n, melt, inner);
+  return vanilla(melt);
+}
+// what it drips when it melts
+vec3 customCoreDrip() {
+  if (uCore == 1) return vec3(0.86, 0.77, 0.88);
+  if (uCore == 2) return vec3(0.95, 0.66, 0.65);
+  if (uCore == 3) return vec3(0.83, 0.9, 0.7);
+  if (uCore == 4) return vec3(0.84, 0.1, 0.34);
+  if (uCore == 5) return vec3(0.97, 0.96, 0.92);
+  return vec3(0.99, 0.9, 0.66);
+}
+
 Mat shellMaterial(vec3 p, vec3 q, vec3 n, float melt) {
+  if (uCustom) {
+    if (uCoat == 1) return whiteChocolate(p, melt);
+    if (uCoat == 0) return darkChocolate(p, melt);
+    return customCore(p, q, n, melt, false);
+  }
   if (uMint) return mintCream(p, q, melt, false);
   if (uBerry) return berryMilk(p, q, melt, false);
   if (uCoco) return cocoIce(p, q, n, melt, false);
@@ -942,11 +985,15 @@ Mat creamCore(vec3 q, float melt) {
 
 Mat fracture() {
   Mat m;
+  if (uCustom && uCoat == 2) {
+    m = customCore(vec3(0.0), vec3(0.0), vec3(0.0, 0.0, 1.0), 0.0, true);
+    return m;
+  }
   if (uMint) {
     m = mintCream(vec3(0.0), vec3(0.0), 0.0, true);
     return m;
   }
-  if (uWhite) {
+  if (uWhite || (uCustom && uCoat == 1)) {
     // freshly snapped white chocolate: matte, creamy and a touch paler
     m.albedo = srgb(vec3(0.94, 0.89, 0.77));
     m.rough = 0.75;
@@ -958,6 +1005,16 @@ Mat fracture() {
   }
   if (uBerry) {
     m = berryMilk(vec3(0.0), vec3(0.0), 0.0, true);
+    return m;
+  }
+  if (customCoated()) {
+    // freshly snapped dark chocolate
+    m.albedo = srgb(vec3(0.42, 0.25, 0.15));
+    m.rough = 0.78;
+    m.sss = 0.05;
+    m.sssCol = srgb(vec3(0.6, 0.3, 0.14));
+    m.spec = 0.5;
+    m.sheen = 0.0;
     return m;
   }
   if (uCoco) {
@@ -1040,10 +1097,11 @@ vec3 shade(vec3 p, vec3 rd, float pix) {
     else if (uCoco) { m = cocoIce(p, P.q, n, uMeltC, true); bumpAmp = 0.2; bumpFreq = 22.0; }
     else if (uBerry) { m = berryMilk(p, P.q, uMeltC, true); bumpAmp = 0.2; bumpFreq = 22.0; }
     else if (uMint) { m = mintCream(p, P.q, uMeltC, true); bumpAmp = 0.2; bumpFreq = 22.0; }
+    else if (uCustom) { m = customCore(p, P.q, n, 0.1, true); bumpAmp = 0.3; bumpFreq = 22.0; }
     else { m = creamCore(P.q, 0.1); m.albedo *= 0.96; bumpAmp = 0.35; bumpFreq = 22.0; }
   } else if (P.crumb <= best + 1e-5) {
     m = fracture();
-    m.albedo = mix(m.albedo, srgb(uMint ? vec3(0.82, 0.89, 0.66) : uWhite ? vec3(0.93, 0.88, 0.75) : uBerry ? vec3(0.93, 0.6, 0.59) : uCoco ? vec3(0.95, 0.94, 0.9) : uFaluda ? vec3(0.91, 0.17, 0.47) : vec3(0.36, 0.2, 0.11)), 0.5);
+    if (!uCustom) m.albedo = mix(m.albedo, srgb(uMint ? vec3(0.82, 0.89, 0.66) : uWhite ? vec3(0.93, 0.88, 0.75) : uBerry ? vec3(0.93, 0.6, 0.59) : uCoco ? vec3(0.95, 0.94, 0.9) : uFaluda ? vec3(0.91, 0.17, 0.47) : vec3(0.36, 0.2, 0.11)), 0.5);
     bumpAmp = 0.5; bumpFreq = 25.0;
   } else {
     // body (shell / core), stick, liquid blend
@@ -1055,7 +1113,8 @@ vec3 shade(vec3 p, vec3 rd, float pix) {
         // (chocolate, or wet ice: never chocolate under the faluda's rose ice)
         float slumpS = smoothstep(0.2, 0.55, uMeltC);
         Mat soft;
-        if (uCoco) soft = cocoIce(p, P.q, n, chocLocal, true);
+        if (uCustom) soft = shellMaterial(p, P.q, n, chocLocal);
+        else if (uCoco) soft = cocoIce(p, P.q, n, chocLocal, true);
         else if (uFaluda) soft = faludaIce(p, P.q, chocLocal);
         else soft = chocolate(p, chocLocal);
         bm = mixMat(fracture(), soft, slumpS);
@@ -1063,7 +1122,7 @@ vec3 shade(vec3 p, vec3 rd, float pix) {
       } else {
         bm = shellMaterial(p, P.q, n, chocLocal);
         bumpAmp = mix(0.05, 0.03, chocLocal); bumpFreq = 1.15;
-        bumpAmp2 = (softLolly() ? 0.05 : uFaluda ? 0.035 : 0.008) * (1.0 - chocLocal); bumpFreq2 = 46.0;
+        bumpAmp2 = (softLolly() ? 0.05 : iceShell() ? 0.035 : 0.008) * (1.0 - chocLocal); bumpFreq2 = 46.0;
         if (softLolly()) {
           // where a finger pressed, the surface is smoothed and a bit glossy
           float pressed = smoothstep(0.02, 0.15, P.sink);
@@ -1071,10 +1130,10 @@ vec3 shade(vec3 p, vec3 rd, float pix) {
           bm.rough = mix(bm.rough, 0.3, 0.6 * pressed);
           bm.sheen *= 1.0 - pressed;
         }
-        if (uFaluda && !softLolly()) {
+        if (iceShell()) {
           // ice turns white around a break (stress crazing)
           float craze = smoothstep(0.03, 0.4, P.cnear) * (1.0 - chocLocal);
-          bm.albedo = mix(bm.albedo, srgb(uCoco ? vec3(1.0, 1.0, 0.98) : vec3(1.0, 0.8, 0.87)), 0.5 * craze);
+          bm.albedo = mix(bm.albedo, srgb(cocoFlavor() ? vec3(1.0, 1.0, 0.98) : vec3(1.0, 0.8, 0.87)), 0.5 * craze);
           bm.rough = mix(bm.rough, 0.55, 0.5 * craze);
           bm.sheen += 0.4 * craze;
         }
@@ -1095,14 +1154,15 @@ vec3 shade(vec3 p, vec3 rd, float pix) {
       bumpAmp = mix(0.12, 0.03, chocLocal); bumpFreq = 21.0;
     } else {
       float vm = clamp(uMeltV * 1.15 + P.fill * 0.6 + P.hole * uMeltV * 0.4, 0.0, 1.0);
-      bm = creamCore(P.q, vm);
+      if (uCustom) bm = customCore(p, P.q, n, vm, true);
+      else bm = creamCore(P.q, vm);
       bm.albedo *= P.cao;
       bm.spec *= P.cao;
       bumpAmp = mix(0.42, 0.04, vm); bumpFreq = 21.0;
       bumpAmp2 = mix(0.08, 0.0, vm); bumpFreq2 = 3.0;
     }
     // the passionfruit gel sacs bulge (only on the body, not the stick or drips)
-    if (uCoco && P.shell <= P.core) seedBump = gSeedBump;
+    if (cocoFlavor() && P.shell <= P.core) seedBump = gSeedBump;
     float engr = 0.0;
     if (P.stick < 0.05 && abs(p.z) > 0.05) engr = engraveMask(p);
     Mat sm = wood(p, engr);
@@ -1118,6 +1178,10 @@ vec3 shade(vec3 p, vec3 rd, float pix) {
       lv.albedo = srgb(uMint ? vec3(0.83, 0.9, 0.7) : uWhite ? vec3(0.86, 0.77, 0.88) : uBerry ? vec3(0.95, 0.66, 0.65) : uCoco ? vec3(0.97, 0.96, 0.92) : uFaluda ? vec3(0.98, 0.76, 0.8) : vec3(0.99, 0.9, 0.66));
       Mat lc = shellMaterial(p, P.q, n, 1.0);
       lc.albedo = srgb(uMint ? vec3(0.83, 0.9, 0.7) : uWhite ? vec3(0.96, 0.91, 0.79) : uBerry ? vec3(0.95, 0.66, 0.65) : uCoco ? vec3(0.97, 0.56, 0.03) : uFaluda ? vec3(0.84, 0.1, 0.34) : vec3(0.4, 0.235, 0.135));
+      if (uCustom) {
+        lv.albedo = srgb(customCoreDrip());
+        lc.albedo = srgb(uCoat == 0 ? vec3(0.4, 0.235, 0.135) : uCoat == 1 ? vec3(0.96, 0.91, 0.79) : customCoreDrip());
+      }
       lc.rough = 0.08;
       Mat lm = mixMat(lv, lc, P.liqC);
       lm.rough = 0.07;
@@ -1130,7 +1194,7 @@ vec3 shade(vec3 p, vec3 rd, float pix) {
 
   vec3 nb = bumpNormal(p, n, bumpFreq, bumpAmp);
   nb = bumpNormal(p * 1.37, nb, bumpFreq2, bumpAmp2);
-  if (uCoco) nb = normalize(nb + seedBump);
+  if (cocoFlavor()) nb = normalize(nb + seedBump);
 
   // ------- lighting (in world space)
   vec3 nW = normalize(uObjRot * nb);
@@ -1174,7 +1238,7 @@ vec3 shade(vec3 p, vec3 rd, float pix) {
   // frost: a pale velvety glow where the surface turns away from you
   if (m.sheen > 0.0) {
     float graze = pow(1.0 - NoV, 2.5);
-    col += m.sheen * srgb(uMint ? vec3(0.95, 1.0, 0.92) : uBerry ? vec3(1.0, 0.9, 0.9) : uCoco ? vec3(1.0, 0.99, 0.97) : vec3(1.0, 0.86, 0.91)) * graze
+    col += m.sheen * srgb(uCustom ? vec3(1.0, 0.97, 0.95) : uMint ? vec3(0.95, 1.0, 0.92) : uBerry ? vec3(1.0, 0.9, 0.9) : uCoco ? vec3(1.0, 0.99, 0.97) : vec3(1.0, 0.86, 0.91)) * graze
          * (envIrr(nW) * ao * 0.45 + keyCol * clamp(NoL + 0.3, 0.0, 1.0) * mix(sh, 1.0, 0.4) * 0.22);
   }
   return col;

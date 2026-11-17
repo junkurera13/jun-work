@@ -5,6 +5,7 @@ import { CrackAudio } from "./audio/crack.js";
 import { WeatherAudio } from "./audio/weather.js";
 import { WeatherPicker } from "./ui/weather.js";
 import { Dock } from "./ui/dock.js";
+import { Maker, loadRecipes, makeFlavor, saveRecipes } from "./ui/maker.js";
 import { FLAVORS } from "./flavors.js";
 import { Fracture } from "./sim/fracture.js";
 import { Liquid } from "./sim/liquid.js";
@@ -19,6 +20,11 @@ const resetBtn = document.querySelector(".reset");
 const soundBtn = document.querySelector(".sound-toggle");
 const dockRoot = document.querySelector(".flavors");
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+// ice creams you made before (remembered in this browser) join the row
+const recipes = loadRecipes();
+let customCount = 0;
+for (const r of recipes) FLAVORS.push(makeFlavor(r, customCount++));
 
 const FOV = (24 * Math.PI) / 180;
 const TAN = Math.tan(FOV / 2);
@@ -178,7 +184,7 @@ function pick(clientX, clientY) {
   });
   const ro = world.worldToObj(cam.pos.x, cam.pos.y, cam.pos.z);
   const rd = world.worldDirToObj(dw.x, dw.y, dw.z);
-  const M = meltParams(state.P, state.faluda, state.mould, state.white);
+  const M = meltParams(state.P, FLAVORS[state.flavor]);
   let t = cam.D - 12;
   for (let i = 0; i < 140; i++) {
     const x = ro.x + rd.x * t;
@@ -315,7 +321,7 @@ function newIceCream() {
   state.yawVel = 0;
   state.pitchVel = 0;
   fracture.reset(state.faluda, state.mould, !!FLAVORS[state.flavor].soft);
-  liquid.reset(state.faluda, state.mould);
+  liquid.reset(state.faluda, state.mould, FLAVORS[state.flavor].custom ?? null);
   canvas.classList.remove("has-cracked");
   cancelAnimationFrame(resetRevealFrame);
   resetRevealFrame = 0;
@@ -351,13 +357,35 @@ const dock = new Dock(dockRoot, {
     audio.tick(1.1 + i * 0.12);
     selectFlavor(i);
   },
+  onAdd: () => maker.toggle(),
+});
+
+// "create your own": pick a shape, coating and flavour; it joins the row
+const maker = new Maker({
+  onToggle: (open, returnFocus) => {
+    dock.setExpanded(open);
+    if (returnFocus) dock.addButton.focus();
+  },
+  onMake: (recipe) => {
+    recipes.push(recipe);
+    saveRecipes(recipes);
+    const flavor = makeFlavor(recipe, customCount++);
+    FLAVORS.push(flavor);
+    const i = dock.add(flavor);
+    if (document.body.classList.contains("is-ready")) dock.setIcon(i, renderSwatch(flavor, flavor.swatch));
+    dock.set(i);
+    dock.buttons[i].focus({ preventScroll: true });
+  },
 });
 
 // Each picker circle is a round window onto that ice cream's own surface:
 // a close-up of the front of the bar, turned and lit just like the big one,
 // so it shows the real thing (the gloss streak on the chocolate, the frost on
 // the rose ice). The page crops it to a circle.
-function renderSwatch(flavor, { x, y, half, peel = false }) {
+function renderSwatch(flavor, { x, y, half, peel = false, asBar = false }) {
+  // asBar: draw it on the Magic Choc bar's shape (whose framing keeps clear of
+  // the studio reflection), for coated ice creams you make
+  if (asBar) flavor = { ...flavor, faluda: false, mould: 0 };
   const px = 96;
   const ss = 2; // supersampled, then scaled down for smooth edges
   const tan = 0.05;
@@ -377,8 +405,9 @@ function renderSwatch(flavor, { x, y, half, peel = false }) {
       time: 0,
       boundMin: BODY_BOX.min,
       boundMax: BODY_BOX.max,
-      // peel: show what's under the shell (strip it off, as melting does)
-      melt: { ...meltParams(0, flavor.faluda, flavor.mould ?? 0, !!flavor.white), ...(peel ? { chocGone: 1.2 } : {}) },
+      // peel: show what's under the shell (strip it off, as melting does);
+      // a number peels it only partly, leaving patches of the coating
+      melt: { ...meltParams(0, flavor), ...(peel ? { chocGone: peel === true ? 1.2 : peel } : {}) },
       cracks: false,
       ooze: 0,
       primCount: 0,
@@ -473,7 +502,7 @@ function frame(now) {
   // melting
   if (state.appear >= 1) state.P = Math.min(1, state.P + (dt * rate) / MELT_SECONDS);
   if (state.P > 0.04) revealReset();
-  const M = meltParams(state.P, state.faluda, state.mould, state.white);
+  const M = meltParams(state.P, FLAVORS[state.flavor]);
 
   // motion
   // the entrance runs on wall-clock time so it never drags on slow devices
