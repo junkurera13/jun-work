@@ -162,12 +162,13 @@ export class Maker {
     groups.appendChild(
       this.group("shape", "shape", SHAPES, (o) => `<svg class="maker-shape" viewBox="0 0 24 30" aria-hidden="true">${SHAPE_ICONS[o.id]}</svg>`),
     );
+    // flavour first, then what it's dipped in
+    groups.appendChild(this.group("flavour", "core", CORES, (o) => `<span class="maker-dot" style="background:${o.dot}"></span>`));
     groups.appendChild(
       this.group("coating", "coat", COATS, (o) =>
         o.col ? `<span class="maker-dot" style="background:${toCss(o.col)}"></span>` : `<span class="maker-dot maker-dot--none"></span>`,
       ),
     );
-    groups.appendChild(this.group("flavour", "core", CORES, (o) => `<span class="maker-dot" style="background:${o.dot}"></span>`));
 
     back.querySelector(".maker-make").addEventListener("click", () => {
       this.onMake?.({ ...this.recipe });
