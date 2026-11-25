@@ -1504,8 +1504,9 @@ iframe.slide {
     --links-h: 36px;
     --play-left: 0px;
     --play-up: 0px;
-    /* the slide arrows' row under the PLAY items */
-    --nav-h: 60px;
+    /* (no room kept under the PLAY items: the slide arrows sit in the
+       CONTACT row) */
+    --nav-h: 0px;
   }
   .menu {
     grid-area: 1 / 1;
@@ -1569,7 +1570,7 @@ iframe.slide {
     height: 15px;
   }
 
-  /* PLAY: the item centred above a row of slide arrows */
+  /* PLAY: the item centred in the space */
   .list {
     inset: 0 0 var(--nav-h);
     padding: 0;
@@ -1586,21 +1587,22 @@ iframe.slide {
   .slides > .slide-tea {
     translate: none;
   }
+  /* The slide arrows join the CONTACT row, at its right end: they hang
+     below the stage by the row's top padding (10px) and its height. */
   .stage .slide-nav {
     top: auto;
-    right: 0;
-    bottom: 0;
-    left: 0;
+    right: calc(var(--side) + env(safe-area-inset-right));
+    bottom: calc(-10px - var(--links-h));
+    left: auto;
     translate: none;
     width: auto;
-    height: var(--nav-h);
+    height: var(--links-h);
     flex-direction: row;
-    justify-content: center;
-    gap: 16px;
+    gap: 6px;
   }
   .slide-nav .box {
-    width: 40px;
-    height: 40px;
+    width: var(--links-h);
+    height: var(--links-h);
   }
   /* the up and down arrows turned to point back and forward */
   .slide-nav svg {
@@ -1684,11 +1686,34 @@ iframe.slide {
   }
 }
 
-/* Smaller phones: the menu row would be too tight at 32px. */
+/* On phones the count doesn't fit in the CONTACT row; the arrows do. */
+@media (max-width: 640px) {
+  .slide-count {
+    display: none;
+  }
+}
+
+/* Smaller phones: the menu row would be too tight at 32px, and the
+   CONTACT row with the arrows at 36px. */
 @media (max-width: 389px) {
   body {
     --menu-size: 24px;
     --side: 16px;
+    --links-h: 34px;
+  }
+  .contact {
+    padding: 0 10px;
+  }
+}
+@media (max-width: 359px) {
+  .links {
+    gap: 4px;
+  }
+  .links .divider {
+    display: none;
+  }
+  .contact {
+    font-size: 14px;
   }
 }
 
