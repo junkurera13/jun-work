@@ -4,7 +4,7 @@
   --muted: #a3a3a3;
   --line: #e4e4e4;
   --heat: 0.75;
-  color-scheme: light;
+  color-scheme: only light;
 }
 
 @supports (width: 1dvmin) {

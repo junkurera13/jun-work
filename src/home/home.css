@@ -6,6 +6,8 @@
    its own (src/home/icecream-view.js), in which case it fades over. */
 :root {
   --page: #efff47;
+  /* never recoloured by a phone's dark mode (see index.html) */
+  color-scheme: only light;
 }
 html,
 body {
