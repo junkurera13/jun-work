@@ -44,11 +44,14 @@ body {
    real to Chrome: src/home/choices.js swaps it whenever a letter or
    marker hides, so the whole menu is repainted and no thin edge of the
    hidden glyph is left behind. */
+/* (Kept in custom properties so the minifier can't round them to fully
+   transparent, which Chrome would skip painting.) */
 .menu {
-  background-color: color(srgb 0 0 0 / 0.001);
+  --flush: color(srgb 0 0 0 / 0.001);
+  background-color: var(--flush);
 }
 .menu.is-flushed {
-  background-color: color(srgb 0 0 0 / 0.0011);
+  --flush: color(srgb 0 0 0 / 0.0011);
 }
 .choice {
   font-size: var(--menu-size);
