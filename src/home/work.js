@@ -89,7 +89,18 @@ export function setupWork() {
   // The sections sit side by side, as placed in index.html. On phones that
   // row is far wider than the screen, so they stack top to bottom instead
   // (needs the canvas shown, to measure them).
+  // Stacked, a project shows about a quarter size, so its title, tags and
+  // brief would be a few pixels tall: each header is scaled up (--head-zoom)
+  // to read at its normal size when the project fills the width.
+  let layoutW = 0;
   const layoutSections = (narrow) => {
+    viewport.classList.toggle("is-stacked", narrow);
+    layoutW = viewW;
+    for (const s of sectionMeta) {
+      const fitZ = (viewW - 24) / (s.el.offsetWidth || 2 * s.hw);
+      if (narrow && fitZ > 0 && fitZ < 1) s.el.style.setProperty("--head-zoom", (1 / fitZ).toFixed(3));
+      else s.el.style.removeProperty("--head-zoom");
+    }
     let y = 0;
     for (const s of sectionMeta) {
       if (narrow) {
@@ -103,6 +114,7 @@ export function setupWork() {
       }
       s.el.style.setProperty("--x", `${s.x}px`);
       s.el.style.setProperty("--y", `${s.y}px`);
+      if (s.el.offsetHeight > 0) s.hh = s.el.offsetHeight / 2;
     }
     if (narrow) {
       // centre the stack on the board's origin, like the row
@@ -601,9 +613,9 @@ export function setupWork() {
       if (s.el.offsetHeight > 0) s.hh = s.el.offsetHeight / 2;
     }
     const mode = isNarrow() ? "narrow" : "wide";
-    if (viewW > 0 && mode !== layoutMode) {
-      // first shown, or crossed between phone and wider: (re)place the
-      // projects and frame the current one
+    if (viewW > 0 && (mode !== layoutMode || (mode === "narrow" && Math.abs(viewW - layoutW) > 1))) {
+      // first shown, crossed between phone and wider, or a stacked canvas
+      // changed width: (re)place the projects and frame the current one
       layoutMode = mode;
       layoutSections(mode === "narrow");
       hasInitialFit = true;

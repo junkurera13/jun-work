@@ -508,6 +508,22 @@ iframe.slide {
   outline: 2px solid var(--page);
   outline-offset: 3px;
 }
+/* Stacked on a phone (src/home/work.js): headers scaled up to stay
+   readable at the overview zoom, wrapping to the narrower width */
+.work-canvas.is-stacked .work-section-head {
+  zoom: var(--head-zoom, 1);
+}
+.work-canvas.is-stacked .work-section-top {
+  flex-wrap: wrap;
+  row-gap: 8px;
+}
+.work-canvas.is-stacked .work-section-id {
+  flex-wrap: wrap;
+  row-gap: 8px;
+}
+.work-canvas.is-stacked .work-section-tags {
+  flex-basis: 100%;
+}
 .work-section-brief {
   margin: 0;
   max-width: 92ch;
@@ -1623,9 +1639,8 @@ iframe.slide {
     max-width: 60ch;
     font-size: 15px;
     line-height: 1.65;
-    /* justified monospace opens wide gaps on a narrow measure */
-    text-align: left;
-    hyphens: manual;
+    /* justified, as on desktop (home.css); hyphenation keeps the gaps
+       even on the narrow measure */
   }
 
   /* WORK: the canvas spans the width; the project chips scroll along
@@ -1654,12 +1669,15 @@ iframe.slide {
     top: calc(12px + env(safe-area-inset-top));
     right: calc(12px + env(safe-area-inset-right));
   }
+  /* full width, on a fade so the work scrolling under it stays clear of
+     the chips */
   .work-projects {
     left: 0;
     right: 0;
+    bottom: 0;
     margin: 0;
-    padding: 5px 12px;
-    bottom: calc(var(--canvas-bottom) - 5px);
+    padding: 28px 12px var(--canvas-bottom);
+    background: linear-gradient(to top, rgba(12, 13, 15, 0.92) 45%, rgba(12, 13, 15, 0));
   }
   .work-zoom {
     display: none;
