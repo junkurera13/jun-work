@@ -3,6 +3,7 @@ import { setupChoices } from "./choices.js";
 import { mountMagicChoc } from "./magic-choc.js";
 import { setupIcecreamView } from "./icecream-view.js";
 import { setupSoundButton } from "./sound-button.js";
+import { setupWork } from "./work.js";
 
 setupChoices();
 
@@ -15,3 +16,5 @@ if (stage) setupIcecreamView(stage);
 
 const soundButton = document.querySelector(".sound");
 if (soundButton) setupSoundButton(soundButton);
+
+setupWork();

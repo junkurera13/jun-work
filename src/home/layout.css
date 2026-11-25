@@ -268,6 +268,1182 @@ iframe.slide {
   padding-bottom: calc(50dvh - var(--item-h) / 2 + var(--play-up));
   scroll-padding-bottom: calc(var(--play-up) * 2);
 }
+/* WORK: black interactive spatial canvas on the right of the menu */
+.work-canvas {
+  --canvas-inset: clamp(16px, 2.2vw, 28px);
+  /* Aligns bottom controls on the exact same baseline as .links (CONTACT row) */
+  --canvas-bottom: calc(56px + env(safe-area-inset-bottom) - var(--canvas-inset));
+  position: absolute;
+  inset: var(--canvas-inset) var(--canvas-inset) var(--canvas-inset) 0;
+  border-radius: clamp(16px, 2vw, 24px);
+  background: #0c0d0f;
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.work-canvas.is-panning {
+  cursor: grabbing;
+}
+.work-canvas.is-fullscreen {
+  --canvas-inset: 0px;
+  --canvas-bottom: calc(24px + env(safe-area-inset-bottom));
+  position: fixed;
+  inset: 0;
+  border-radius: 0;
+  z-index: 20;
+}
+.work-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 30px;
+  min-width: 30px;
+  padding: 0;
+  box-sizing: border-box;
+  border: 2px solid rgba(239, 255, 71, 0.34);
+  background: rgba(12, 13, 15, 0.86);
+  color: var(--page);
+  font-family: "Tiny5", ui-monospace, monospace;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 140ms ease, color 140ms ease, border-color 140ms ease;
+}
+.work-btn svg {
+  width: 12px;
+  height: 12px;
+  fill: currentColor;
+  shape-rendering: crispEdges;
+}
+@media (hover: hover) {
+  .work-btn:hover {
+    background: var(--page);
+    border-color: var(--page);
+    color: #111;
+  }
+}
+.work-btn:focus-visible {
+  outline: 2px solid var(--page);
+  outline-offset: 3px;
+}
+.work-fullscreen {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  z-index: 2;
+}
+.work-fullscreen[aria-pressed="false"] .icon-collapse,
+.work-fullscreen[aria-pressed="true"] .icon-expand {
+  display: none;
+}
+.work-projects {
+  position: absolute;
+  left: 24px;
+  bottom: var(--canvas-bottom);
+  z-index: 2;
+  display: flex;
+  gap: 6px;
+}
+.work-proj-btn {
+  gap: 7px;
+  padding: 0 10px;
+  white-space: nowrap;
+}
+.work-proj-btn .work-proj-num {
+  opacity: 0.65;
+}
+.work-proj-btn[aria-current="true"] {
+  background: var(--page);
+  border-color: var(--page);
+  color: #111;
+}
+.work-proj-btn[aria-current="true"] .work-proj-num {
+  opacity: 0.72;
+}
+.work-zoom {
+  position: absolute;
+  right: 24px;
+  bottom: var(--canvas-bottom);
+  z-index: 2;
+  display: flex;
+  gap: 6px;
+}
+.work-zoom-readout {
+  min-width: 52px;
+  padding: 0 8px;
+}
+.work-grid {
+  position: absolute;
+  inset: -72px;
+  pointer-events: none;
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.11) 1px, transparent 1px);
+  background-size: 28px 28px;
+  will-change: transform;
+}
+.work-board {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+/* Each project lives in its own Figma-style spatial section on the board */
+.work-section {
+  position: absolute;
+  left: var(--x, 0px);
+  top: var(--y, 0px);
+  transform: translate(-50%, -50%);
+  width: 1372px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  contain: layout style;
+}
+.work-section.is-offscreen .ob-loader-hop,
+.work-section.is-offscreen .ob-gizmo-pupils,
+.work-canvas.is-moving .ob-loader-hop,
+.work-canvas.is-moving .ob-gizmo-pupils {
+  animation-play-state: paused;
+}
+.work-section-head {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0 4px;
+}
+.work-section-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+.work-section-id {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.work-section-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 22px;
+  padding: 0 7px;
+  background: var(--page);
+  color: #111;
+  font-family: "Tiny5", ui-monospace, monospace;
+  font-size: 13px;
+  line-height: 1;
+}
+.work-section-title {
+  margin: 0;
+  font-family: "Tiny5", ui-monospace, monospace;
+  font-size: 19px;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: #f3f4ef;
+}
+.work-section-tags {
+  font-family: "Azeret Mono", ui-monospace, monospace;
+  font-size: 11px;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.42);
+}
+.work-site-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 26px;
+  padding: 0 10px;
+  border: 1.5px solid rgba(239, 255, 71, 0.42);
+  background: rgba(12, 13, 15, 0.72);
+  color: var(--page);
+  font-family: "Tiny5", ui-monospace, monospace;
+  font-size: 12px;
+  line-height: 1;
+  letter-spacing: 0.03em;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background-color 140ms ease, color 140ms ease, border-color 140ms ease;
+}
+.work-site-link svg {
+  width: 9px;
+  height: 9px;
+  fill: currentColor;
+  shape-rendering: crispEdges;
+}
+@media (hover: hover) {
+  .work-site-link:hover {
+    background: var(--page);
+    border-color: var(--page);
+    color: #111;
+  }
+}
+.work-site-link:focus-visible {
+  outline: 2px solid var(--page);
+  outline-offset: 3px;
+}
+.work-section-brief {
+  margin: 0;
+  max-width: 92ch;
+  font-family: "Azeret Mono", ui-monospace, monospace;
+  font-size: 12px;
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.58);
+}
+.work-frame {
+  position: relative;
+  display: grid;
+  grid-template-columns: 400px 604px 276px;
+  gap: 18px;
+  padding: 26px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  background: rgba(255, 255, 255, 0.024);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+.work-gizmo-col {
+  height: 744px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 0 10px;
+  box-sizing: border-box;
+  border-radius: 14px;
+  background: radial-gradient(75% 60% at 50% 48%, rgba(239, 255, 71, 0.045), rgba(0, 0, 0, 0) 72%);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+.work-gizmo {
+  position: relative;
+  width: 386px;
+  height: 580px;
+  margin: auto 0;
+}
+.gizmo-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  transition: opacity 350ms ease;
+  filter: drop-shadow(0 28px 36px rgba(0, 0, 0, 0.72)) drop-shadow(0 6px 12px rgba(0, 0, 0, 0.48));
+}
+.work-gizmo.is-live .gizmo-canvas {
+  opacity: 1;
+}
+.work-hint {
+  margin: 0 0 8px;
+  font-family: "Azeret Mono", ui-monospace, monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.36);
+  pointer-events: none;
+}
+.work-col-mid {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.work-col-mid-bottom {
+  display: grid;
+  grid-template-columns: 279px 1fr;
+  gap: 18px;
+}
+.work-col-right {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.work-card {
+  position: relative;
+  margin: 0;
+  overflow: hidden;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: #000;
+  cursor: zoom-in;
+  transition: border-color 180ms ease, transform 200ms ease, box-shadow 200ms ease;
+}
+.work-card:hover {
+  border-color: rgba(239, 255, 71, 0.58);
+  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.48);
+}
+.work-card.is-focused {
+  border-color: var(--page);
+  cursor: zoom-out;
+}
+.work-card:focus-visible {
+  outline: 2px solid var(--page);
+  outline-offset: 3px;
+}
+.work-card img,
+.work-card video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+.work-card--web {
+  width: 604px;
+  height: 377px;
+}
+.work-card--backseat {
+  height: 349px;
+}
+.work-card--character {
+  height: 349px;
+  padding: 20px;
+  box-sizing: border-box;
+}
+.work-card--character img {
+  object-fit: contain;
+}
+.work-card--hand {
+  height: 350px;
+}
+.work-card--world {
+  height: 376px;
+}
+.work-card-tag {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  padding: 4px 7px;
+  background: rgba(12, 13, 15, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: rgba(255, 255, 255, 0.86);
+  font-family: "Tiny5", ui-monospace, monospace;
+  font-size: 11px;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  opacity: 0;
+  transition: opacity 160ms ease;
+  pointer-events: none;
+}
+.work-card:hover .work-card-tag,
+.work-card.is-focused .work-card-tag {
+  opacity: 1;
+}
+/* ---- 02 ODDBOX KIDS spatial showcase ---- */
+@font-face {
+  font-family: "Neue Montreal";
+  src: url("/oddbox/fonts/NeueMontreal-Regular.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+.work-section[data-project="oddbox-kids"] {
+  width: 1393px;
+}
+.work-frame--oddbox {
+  grid-template-columns: 576px 473px 256px;
+}
+.ob-col-left {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.ob-card-video {
+  width: 576px;
+  height: 334px;
+}
+/* Live Interactive Oddbox Kids Discover App Home (1:1 port of discover.tsx + top-bar.tsx + oddbox.css) */
+.ob-app-live {
+  width: 576px;
+  height: 392px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: #1f9cf0;
+  font-family: "Neue Montreal", system-ui, sans-serif;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+}
+.ob-app-hero {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.ob-app-hero-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 75%;
+  pointer-events: none;
+}
+.ob-app-topbar {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 10px 0;
+}
+/* Sound button: white circle matching top-bar.tsx .sound-button */
+.ob-app-sound {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  color: #000;
+}
+.ob-app-sound svg {
+  width: 56%;
+  height: 56%;
+}
+/* Top-right signed-in white pill matching top-bar.tsx .kids-pill (p-1.5 pr-4 gap-2.5, 52px avatar + 34px lock scaled 0.44x) */
+.ob-app-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4.5px;
+  padding: 2.5px 7px 2.5px 2.5px;
+  border-radius: 999px;
+  background: #fff;
+}
+.ob-app-avatar-slot {
+  display: block;
+  width: 23px;
+  height: 23px;
+}
+.ob-app-pill .ob-lock-btn--mini {
+  width: 15px;
+  height: 23px;
+  border-radius: 0;
+  background: transparent;
+}
+.ob-app-pill .ob-lock-btn--mini:hover {
+  background: transparent;
+}
+.ob-app-pill .ob-lock-btn--mini svg {
+  width: 15px;
+  height: 15px;
+}
+.ob-app-title {
+  position: absolute;
+  left: 50%;
+  top: 28px;
+  transform: translateX(-50%);
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-family: "Luckiest Guy", cursive, sans-serif;
+  line-height: 0.9;
+  pointer-events: none;
+}
+.ob-app-title-eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: #fff;
+  text-transform: uppercase;
+}
+.ob-app-title-main {
+  margin-top: 2px;
+  font-size: 43px;
+  color: #f9027b;
+  -webkit-text-stroke: 4.5px #fff;
+  paint-order: stroke fill;
+  text-transform: uppercase;
+}
+.ob-app-shelf {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  padding: 20px 10px 15px;
+  background: #1f9cf0;
+  color: #fff;
+}
+/* Exact Fredoka 600 tabs aligned with first card's left edge (discover.tsx) */
+.ob-shelf-tabs {
+  display: flex;
+  gap: 15px;
+  padding-left: 44px;
+}
+.ob-shelf-tab {
+  appearance: none;
+  border: 0;
+  background: none;
+  padding: 2px 0;
+  color: #fff;
+  opacity: 0.5;
+  font-family: "Fredoka", system-ui, sans-serif;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  transition: opacity 180ms ease;
+}
+.ob-shelf-tab[aria-selected="true"],
+.ob-shelf-tab:hover {
+  opacity: 1;
+}
+.ob-shelf-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+/* Exact yellow jelly ShelfArrow proportions (h-28 w-16 rounded-[1.1rem] scaled 0.42x) */
+.ob-shelf-arrow {
+  display: grid;
+  place-items: center;
+  width: 27px;
+  height: 47px;
+  flex-shrink: 0;
+  margin-bottom: 16px;
+  padding: 0;
+  border: 0;
+  border-radius: 7.5px;
+  background: #fdf802;
+  color: #f9027b;
+  cursor: pointer;
+  transition: transform 300ms ease;
+}
+.ob-shelf-arrow:hover {
+  transform: scale(1.05);
+}
+.ob-shelf-arrow svg {
+  width: 15px;
+  height: 15px;
+}
+.ob-shelf-viewport {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  padding: 6px 5px 2px;
+  margin: -6px -5px -2px;
+}
+.ob-shelf-track {
+  --gap: 10px;
+  --offset: 0;
+  display: flex;
+  gap: var(--gap);
+  transform: translateX(calc(var(--offset) * -1 * ((100% + var(--gap)) / 4)));
+  transition: transform 480ms cubic-bezier(0.34, 1.4, 0.5, 1);
+}
+.ob-ep-card {
+  appearance: none;
+  border: 0;
+  background: none;
+  padding: 0;
+  width: calc((100% - 3 * var(--gap)) / 4);
+  flex-shrink: 0;
+  text-align: center;
+  color: #fff;
+  font-family: "Neue Montreal", system-ui, sans-serif;
+  font-weight: 400;
+  cursor: pointer;
+}
+.ob-ep-frame {
+  display: block;
+  padding: 2.5px;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 0 0 0 #fff;
+  transition: box-shadow 500ms cubic-bezier(0.34, 1.8, 0.5, 1), scale 500ms cubic-bezier(0.34, 1.8, 0.5, 1);
+}
+.ob-ep-card:hover .ob-ep-frame {
+  box-shadow: 0 0 0 3.5px #fff;
+}
+.ob-ep-card:active .ob-ep-frame {
+  scale: 0.98;
+}
+.ob-ep-media {
+  position: relative;
+  display: block;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border-radius: 9.5px;
+  background: #ebebed;
+}
+.ob-ep-media img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+  transition: transform 500ms cubic-bezier(0.34, 1.8, 0.5, 1);
+}
+.ob-ep-card:hover .ob-ep-media img {
+  transform: scale(1.04);
+}
+.ob-ep-mins {
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  padding: 2.5px 5.5px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-family: "Neue Montreal", system-ui, sans-serif;
+  font-size: 7.5px;
+  font-weight: 400;
+  line-height: 1;
+}
+/* Exact Create card hover from discover.tsx: plus stays text-black/45, only rotates 90deg & scales 1.1 */
+.ob-ep-media--create {
+  display: grid;
+  place-items: center;
+  background: #ebebed;
+}
+.ob-create-circle {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #fff;
+  color: rgba(0, 0, 0, 0.45);
+  transition: transform 500ms cubic-bezier(0.34, 1.8, 0.5, 1);
+}
+.ob-create-circle svg {
+  width: 17px;
+  height: 17px;
+}
+.ob-ep-create:hover .ob-create-circle {
+  transform: rotate(90deg) scale(1.1);
+}
+.ob-ep-title {
+  display: block;
+  margin-top: 6px;
+  font-family: "Neue Montreal", system-ui, sans-serif;
+  font-size: 9.5px;
+  font-weight: 400;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ob-card-avatar {
+  width: 473px;
+  height: 744px;
+}
+.ob-col-side {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.ob-avatar-circle {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  overflow: hidden;
+}
+.ob-avatar-circle svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+/* Brand & Stacked ODD / BOX Logo System Tile */
+.ob-brand-card {
+  height: 363px;
+  display: grid;
+  grid-template-rows: 1.15fr 1.15fr 32px;
+  overflow: hidden;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: #ffffff;
+}
+.ob-brand-top {
+  display: grid;
+  place-items: center;
+  background: #ffffff;
+}
+.ob-logo-stacked {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-family: "Michroma", ui-sans-serif, system-ui, sans-serif;
+  font-size: 32px;
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  line-height: 1;
+  text-transform: uppercase;
+  color: #000;
+  -webkit-text-stroke: 0.16em currentColor;
+  paint-order: stroke fill;
+  padding-left: 0.14em;
+}
+.ob-brand-show {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #1f9cf0;
+  font-family: "Luckiest Guy", cursive, sans-serif;
+  line-height: 0.9;
+}
+.ob-show-eyebrow {
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: #fff;
+  text-transform: uppercase;
+}
+.ob-show-gizmo {
+  margin-top: 3px;
+  font-size: 46px;
+  color: #f9027b;
+  -webkit-text-stroke: 5.5px #fff;
+  paint-order: stroke fill;
+  text-transform: uppercase;
+}
+.ob-swatches {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+}
+.ob-swatches span {
+  display: block;
+  height: 100%;
+}
+/* Hopping Gizmo Loader (with cycling eyes!) + Interactive 4-Dot Menu & Teasing Parents Lock */
+.ob-craft-card {
+  height: 363px;
+  display: grid;
+  grid-template-rows: 1fr 84px;
+  overflow: hidden;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: #ffffff;
+}
+.ob-loader-stage {
+  display: grid;
+  place-items: center;
+  padding-top: 36px;
+  background: #fdf802;
+}
+.ob-loader-hop {
+  width: 78px;
+  height: 78px;
+  transform-origin: 50% 100%;
+  animation: ob-gizmo-jump 900ms cubic-bezier(0.3, 0, 0.3, 1) infinite;
+  pointer-events: none;
+}
+@keyframes ob-gizmo-jump {
+  0%   { transform: translateY(0) scale(1.12, 0.88); }
+  15%  { transform: translateY(0) scale(0.94, 1.06); }
+  50%  { transform: translateY(-50px) scale(1, 1); }
+  85%  { transform: translateY(0) scale(0.96, 1.04); }
+  100% { transform: translateY(0) scale(1.12, 0.88); }
+}
+/* Gizmo's pupils cycle playfully: top-right -> bottom-right -> bottom-left -> top-left */
+.ob-gizmo-pupils {
+  animation: ob-gizmo-look 3.6s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+@keyframes ob-gizmo-look {
+  0%, 19%   { transform: translate(2.1px, -2.3px); }
+  25%, 44%  { transform: translate(2.1px, 2.3px); }
+  50%, 69%  { transform: translate(-2.1px, 2.3px); }
+  75%, 94%  { transform: translate(-2.1px, -2.3px); }
+  100%      { transform: translate(2.1px, -2.3px); }
+}
+.ob-micro-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 26px;
+  background: #ffffff;
+}
+/* 4-Dot Menu Toggle (spins 180 deg & turns Gizmo pink on click) */
+.ob-dots-btn {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #000;
+  cursor: pointer;
+  transition: background-color 300ms ease, transform 140ms ease;
+}
+.ob-dots-btn:active {
+  transform: scale(0.93);
+}
+.ob-dots-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 7px);
+  gap: 3px;
+  transition: transform 420ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.ob-dots-grid i {
+  display: block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #fff;
+}
+.ob-dots-btn[aria-pressed="true"] {
+  background: #f9027b;
+}
+.ob-dots-btn[aria-pressed="true"] .ob-dots-grid {
+  transform: rotate(180deg);
+}
+/* Teasing Parents Lock (exact verbatim hover rules from web/app/_oddbox/oddbox.css) */
+.ob-lock-btn {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #f4f4f5;
+  color: #000;
+  cursor: pointer;
+  transition: background-color 160ms ease, transform 140ms ease;
+}
+.ob-lock-btn:hover {
+  background: #ebebed;
+}
+.ob-lock-btn:active {
+  transform: scale(0.92);
+}
+.ob-lock-btn svg {
+  width: 28px;
+  height: 28px;
+  overflow: visible;
+}
+.ob-lock-btn svg path {
+  transform-box: fill-box;
+}
+.ob-lock-shackle {
+  transform-origin: 100% 100%;
+  transition: transform 420ms cubic-bezier(0.34, 1.8, 0.5, 1);
+}
+.ob-lock-body {
+  transform-origin: 50% 100%;
+}
+@keyframes ob-lock-wiggle {
+  0%, 100% { transform: rotate(0); }
+  25% { transform: rotate(-8deg); }
+  55% { transform: rotate(6deg); }
+  80% { transform: rotate(-3deg); }
+}
+@media (hover: hover) and (pointer: fine) {
+  .ob-lock-btn:hover .ob-lock-shackle {
+    transform: translateY(-3px) rotate(-14deg);
+  }
+  .ob-lock-btn:hover .ob-lock-body {
+    animation: ob-lock-wiggle 520ms ease-in-out;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ob-loader-hop, .ob-gizmo-pupils, .ob-lock-body { animation: none !important; }
+  .ob-dots-grid, .ob-lock-shackle { transition: none; }
+}
+/* ---- 03 SLATE spatial showcase ---- */
+@font-face {
+  font-family: "Allo";
+  src: url("/slate/fonts/AlloVariable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+.work-section[data-project="slate"] {
+  width: 1456px;
+}
+.work-frame--slate {
+  grid-template-columns: 1138px 248px;
+}
+/* 2x2 grid of exact 16:10 (1080x676 -> 560x350) real Slate videos — zero cropping! */
+.sl-video-grid {
+  display: grid;
+  grid-template-columns: 560px 560px;
+  grid-template-rows: 350px 350px;
+  gap: 18px;
+}
+.sl-video-card {
+  width: 560px;
+  height: 350px;
+  background: #141414;
+}
+.sl-video-card video {
+  object-fit: contain;
+  background: #141414;
+}
+.sl-col-right {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+/* Dedicated Voice Mode Card (Listening white wave + Talking amber->coral wave from Quick.tsx) */
+.sl-voice-card {
+  width: 248px;
+  height: 214px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 20px;
+  padding: 18px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background:
+    radial-gradient(80% 60% at 24% 24%, rgba(255, 255, 255, 0.07), transparent 72%),
+    radial-gradient(80% 60% at 78% 82%, rgba(255, 132, 76, 0.22), transparent 72%),
+    #111215;
+}
+.sl-voice-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+}
+.sl-quick-pill {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 100%;
+  height: 44px;
+  padding: 5px 14px 5px 5px;
+  box-sizing: border-box;
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(24, 25, 29, 0.92), rgba(14, 14, 16, 0.94));
+  box-shadow: 0 12px 24px -10px rgba(0, 0, 0, 0.55);
+}
+.sl-quick-pill::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  pointer-events: none;
+  background: linear-gradient(
+    165deg,
+    rgb(255 255 255 / 0.36) 0%,
+    rgb(255 255 255 / 0.18) 28%,
+    rgb(255 255 255 / 0.06) 50%,
+    rgb(255 255 255 / 0.18) 72%,
+    rgb(255 255 255 / 0.36) 100%
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+.sl-quick-circle {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 0.1);
+  color: #fff;
+}
+.sl-quick-s {
+  display: block;
+  width: 14px;
+  height: 14px;
+  background: #fff;
+  -webkit-mask: url("/slate/slate-mark.svg") center / contain no-repeat;
+  mask: url("/slate/slate-mark.svg") center / contain no-repeat;
+}
+.sl-quick-wave {
+  flex: 1;
+  height: 18px;
+  display: block;
+  padding-left: 8px;
+  overflow: hidden;
+}
+.sl-voice-cap {
+  font-family: "Azeret Mono", ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.44);
+}
+/* Current Logo Variations: App Icon -> Mark (dark/light) -> Gradient Wordmark */
+.sl-logo-tile {
+  position: relative;
+  width: 248px;
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: #141414;
+}
+.sl-logo-tile--icon {
+  height: 156px;
+  background: #000000;
+  padding: 18px;
+}
+.sl-logo-tile--icon img {
+  display: block;
+  width: 112px;
+  height: 112px;
+  object-fit: contain;
+  pointer-events: none;
+}
+.sl-logo-tile--mark {
+  height: 156px;
+  display: block;
+  padding: 0;
+}
+.sl-logo-tile--word {
+  height: 138px;
+}
+.sl-mark-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  width: 100%;
+  height: 100%;
+}
+.sl-mark-half {
+  display: grid;
+  place-items: center;
+}
+.sl-mark-half--dark {
+  background: #141414;
+}
+.sl-mark-half--light {
+  background: #f2f2f0;
+}
+.sl-mark-glyph {
+  display: block;
+  width: 56px;
+  height: 52px;
+  -webkit-mask: url("/slate/slate-mark.svg") center / contain no-repeat;
+  mask: url("/slate/slate-mark.svg") center / contain no-repeat;
+}
+.sl-mark-half--dark .sl-mark-glyph {
+  background: linear-gradient(160deg, #9a9a9a, #6a6a6a);
+}
+.sl-mark-half--light .sl-mark-glyph {
+  background: #1c1c1c;
+}
+.sl-wordmark {
+  display: block;
+  width: 186px;
+  height: 32px;
+  background: linear-gradient(180deg, #9a9a9a, #6a6a6a);
+  -webkit-mask: url("/slate/slate-wordmark.svg") center / contain no-repeat;
+  mask: url("/slate/slate-wordmark.svg") center / contain no-repeat;
+}
+.sl-logo-cap {
+  position: absolute;
+  left: 12px;
+  bottom: 9px;
+  font-family: "Azeret Mono", ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.36);
+  pointer-events: none;
+}
+/* ---- 04 CAST spatial showcase ---- */
+.work-section[data-project="cast"] {
+  width: 1492px;
+}
+.work-frame--cast {
+  grid-template-columns: 536px 574px 294px;
+}
+.cs-col-left,
+.cs-col-mid,
+.cs-col-right {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.cs-card-vid1 {
+  width: 536px;
+  height: 324px;
+  background: #000;
+}
+.cs-card-vid2 {
+  width: 536px;
+  height: 326px;
+  background: #000;
+}
+.cs-card-vid1 video,
+.cs-card-vid2 video {
+  object-fit: contain;
+  background: #000;
+}
+.cs-card-hero {
+  width: 574px;
+  height: 298px;
+  background: #81c8cd;
+}
+.cs-card-discover {
+  width: 574px;
+  height: 352px;
+  background: #000;
+}
+.cs-card-modal {
+  width: 294px;
+  height: 360px;
+  background: #000;
+}
+/* Cast Icon Card: standalone CastMark (hover cycles teal/white/lime) */
+.cs-brand-card {
+  width: 294px;
+  height: 290px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: #08090a;
+}
+.cs-mark-svg {
+  width: 112px;
+  height: auto;
+  color: #81c8cd;
+  transition: color 200ms ease, transform 240ms cubic-bezier(0.34, 1.8, 0.5, 1);
+}
+.cs-brand-card:hover .cs-mark-svg {
+  animation: cs-logo-cycle 1.5s linear infinite;
+  transform: scale(1.06);
+}
+@keyframes cs-logo-cycle {
+  0%, 100% { color: #81c8cd; }
+  33% { color: #ffffff; }
+  66% { color: #bfff00; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cs-brand-card:hover .cs-mark-svg {
+    animation: none;
+  }
+}
+/* ---- 05 OMURICE spatial showcase ---- */
+.work-section[data-project="omurice"] {
+  width: 1190px;
+}
+.work-frame--omurice {
+  display: block;
+}
+.om-grid {
+  display: grid;
+  grid-template-columns: 560px 560px;
+  grid-template-rows: 350px 350px;
+  gap: 18px;
+}
+.om-card {
+  width: 560px;
+  height: 350px;
+  background: #141414;
+}
+.om-card video {
+  object-fit: contain;
+  background: #141414;
+}
 .about {
   position: absolute;
   inset: 0;
@@ -284,7 +1460,7 @@ iframe.slide {
   overflow-y: auto;
 }
 .about-text {
-  max-width: 60ch;
+  max-width: min(54ch, 92%);
 }
 /* Phones: the column stays on the left, just smaller. */
 @media (max-width: 640px) {
@@ -309,5 +1485,19 @@ iframe.slide {
   }
   .about-text {
     font-size: 13px;
+  }
+  .work-canvas:not(.is-fullscreen) {
+    --canvas-inset: 12px;
+    border-radius: 14px;
+  }
+  .work-fullscreen {
+    top: 14px;
+    right: 14px;
+  }
+  .work-projects {
+    left: 14px;
+  }
+  .work-zoom {
+    right: 14px;
   }
 }

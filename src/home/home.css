@@ -150,6 +150,9 @@ body {
   font-size: 17px;
   line-height: 1.6;
   color: #111;
+  /* justified; hyphenation keeps the monospace gaps from opening up */
+  text-align: justify;
+  hyphens: auto;
 }
 .about-text p {
   margin: 0 0 1em;
