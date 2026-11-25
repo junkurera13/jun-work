@@ -1,0 +1,238 @@
+/* The home page's shared styles: the yellow page, the
+   Tiny5 choices with their markers and typing hover, the scrolling lists,
+   the live Magic Choc and the about text. The layout itself is in index.html. */
+
+/* --page is the page colour: yellow, unless a PLAY item on screen asks for
+   its own (src/home/icecream-view.js), in which case it fades over. */
+:root {
+  --page: #efff47;
+}
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--page);
+  transition: background-color 600ms ease;
+}
+body {
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  --item-h: min(62dvh, 560px);
+}
+
+/* ---- choices (WORK / PLAY / ABOUT) ---- */
+
+.choice {
+  pointer-events: auto;
+  appearance: none;
+  border: 0;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: "Tiny5", ui-monospace, monospace;
+  font-size: clamp(36px, 7vw, 104px);
+  line-height: 1;
+  color: #111;
+  position: relative;
+}
+/* Hover retypes the word letter by letter. Letters only hide, never
+   collapse, so the word's width and the markers stay put. */
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .choice:hover .letter {
+    animation: type-in 1ms calc((var(--i) + 1) * 70ms) both;
+  }
+}
+@keyframes type-in {
+  from {
+    visibility: hidden;
+  }
+  to {
+    visibility: visible;
+  }
+}
+.choice:focus-visible {
+  outline: 2px solid #111;
+  outline-offset: 8px;
+}
+/* Markers sit outside the word so it doesn't shift when toggled.
+   Hiding them by removing or repainting left a thin stale sliver of
+   the "[" on screen (Chrome didn't clear its old pixels). Each marker
+   gets its own compositor layer and only its opacity changes, so the
+   page is never repainted around it. */
+.choice::before,
+.choice::after {
+  position: absolute;
+  top: 0;
+  opacity: 0;
+  will-change: opacity;
+}
+.choice::before {
+  content: attr(data-open);
+  right: 100%;
+}
+.choice::after {
+  content: attr(data-close);
+  left: 100%;
+}
+.choice[aria-pressed="true"]::before,
+.choice[aria-pressed="true"]::after {
+  opacity: 1;
+}
+
+/* ---- the list for the selected choice ---- */
+
+/* A column that scrolls vertically, each item snapping to the centre.
+   (Each page positions it.) */
+.list {
+  margin: 0;
+  padding: calc(50dvh - var(--item-h) / 2) 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-snap-type: y mandatory;
+  scrollbar-width: none;
+}
+.list::-webkit-scrollbar {
+  display: none;
+}
+[data-list][hidden] {
+  display: none;
+}
+.item {
+  scroll-snap-align: center;
+}
+.item a {
+  display: block;
+}
+.item a:focus-visible {
+  outline: 2px solid #111;
+  outline-offset: 8px;
+}
+
+/* The live Magic Choc (src/home/magic-choc.js) draws on the canvas.
+   Until its first frame (or if WebGL is missing) the still underneath
+   shows; it's the same view, so the swap is seamless. */
+.live-choc {
+  position: relative;
+  height: var(--item-h);
+  aspect-ratio: 453 / 1104;
+}
+.live-choc img,
+.live-choc canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.live-choc canvas {
+  opacity: 0;
+  transition: opacity 300ms ease;
+}
+.live-choc.is-live canvas {
+  opacity: 1;
+}
+.live-choc.is-live img {
+  visibility: hidden;
+  transition: visibility 0s 300ms;
+}
+
+/* ---- about ---- */
+
+/* Running text is set in Azeret Mono: still techy and monospaced like
+   Tiny5, but easy to read at length. Tiny5 stays for the labels. */
+.about-text {
+  font-family: "Azeret Mono", ui-monospace, monospace;
+  font-size: 17px;
+  line-height: 1.6;
+  color: #111;
+}
+.about-text p {
+  margin: 0 0 1em;
+}
+.about-text p:last-child {
+  margin-bottom: 0;
+}
+/* The Oddware logo, linking to oddware.xyz. The mark itself is never
+   restyled: Michroma, all caps, 0.8em, 0.14em spacing, stroked. It sits in
+   a sharp black box with yellow text, with no hover change. (The right padding is smaller to make up for the
+   letter-spacing after the last letter.) */
+.about-text .oddware {
+  font-family: "Michroma", ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.8em;
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  -webkit-text-stroke: 0.16em currentColor;
+  paint-order: stroke fill;
+  padding: 0.2em 0.36em 0.2em 0.5em;
+  /* nudged up: on the shared baseline the box reads as sitting low next
+     to the surrounding text */
+  position: relative;
+  top: -0.1em;
+  background: #111;
+  color: var(--page);
+  text-decoration: none;
+  box-shadow: inset 0 0 0 2px #111;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+.about-text .oddware:focus-visible {
+  outline: 2px solid #111;
+  outline-offset: 3px;
+}
+
+/* ---- boxes: sharp black buttons (CONTACT, X, sound) ---- */
+
+.box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 30px;
+  box-sizing: border-box;
+  /* the border is always there (black on black), so a box doesn't
+     change size when hover empties it to an outline */
+  border: 2px solid #111;
+  background: #111;
+  color: var(--page);
+  text-decoration: none;
+}
+@media (hover: hover) {
+  /* hover: just the black outline, with black text and icon */
+  .box:hover {
+    background: transparent;
+    color: #111;
+  }
+}
+.box:focus-visible {
+  outline: 2px solid #111;
+  outline-offset: 4px;
+}
+/* X (the social network): a square box with its logo */
+.icon {
+  width: 30px;
+}
+.icon svg {
+  width: 13px;
+  height: 13px;
+  fill: currentColor;
+}
+/* the sound button: a pixel speaker in the same square box as X */
+.sound {
+  padding: 0;
+  cursor: pointer;
+}
+.sound svg {
+  /* 2px per pixel of the 9x7 grid, so the edges stay sharp */
+  width: 18px;
+  height: 14px;
+  shape-rendering: crispEdges;
+}
+.sound[aria-pressed="true"] .sound-off,
+.sound[aria-pressed="false"] .sound-on {
+  display: none;
+}

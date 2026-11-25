@@ -4,28 +4,376 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="description" content="Jun Park." />
-    <meta name="theme-color" content="#ffffff" />
+    <meta name="theme-color" content="#efff47" />
     <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
     <link rel="icon" href="/favicon.png" type="image/png" sizes="64x64" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Azeret+Mono:wght@400&family=Michroma&family=Tiny5&display=swap" rel="stylesheet" />
     <title>jun park</title>
-    <script type="module" src="/src/main.js"></script>
+    <link rel="stylesheet" href="/src/home/home.css" />
+    <script type="module" src="/src/home/main.js"></script>
+    <style>
+      /* Layout variation: WORK, PLAY and ABOUT stacked down the left, all
+         the same size; whichever is selected shows on the right.
+         (Shared styles: src/home/home.css; the original layout is at /.) */
+      body {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        /* the same size as WORK and PLAY on the original layout */
+        --menu-size: clamp(36px, 7vw, 104px);
+        /* lifts the menu and the content a little above the centre of the
+           space over the CONTACT row (they move up by half of this) */
+        --lift: 12dvh;
+        /* the PLAY ice cream (and WORK items) a bit bigger than on / */
+        --item-h: min(70dvh, 630px);
+        /* how far the PLAY items (and the ice cream slide) sit above the
+           exact middle */
+        --play-up: 0.5dvh;
+      }
+      /* The left column. Its width is fixed to fit the widest entry,
+         "(ABOUT)", so the right side never moves when the selection does. */
+      .menu {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: flex-start;
+        gap: calc(var(--menu-size) * 0.3);
+        width: calc(var(--menu-size) * 4.2);
+        padding: 0 12px 0 clamp(24px, 6vw, 96px);
+        /* centred in the space above the CONTACT row (its 56px offset
+           plus its 30px height) */
+        padding-bottom: calc(56px + 30px + env(safe-area-inset-bottom) + var(--lift));
+      }
+      .choice {
+        font-size: var(--menu-size);
+      }
+      /* Here the markers sit in the line, so every entry starts flush at
+         the left edge: "*PLAY*" begins where "WORK" does, rather than the
+         "*" hanging out to the left (which read as centred). The selected
+         word moves over by one marker. */
+      .choice::before,
+      .choice::after {
+        position: static;
+        display: none;
+        opacity: 1;
+        will-change: auto;
+      }
+      .choice[aria-pressed="true"]::before,
+      .choice[aria-pressed="true"]::after {
+        display: inline;
+      }
+      /* CONTACT and X: a row of sharp black boxes pinned to the bottom of
+         the left column, its left edge on the menu's left edge. */
+      .links {
+        position: fixed;
+        left: clamp(24px, 6vw, 96px);
+        bottom: calc(56px + env(safe-area-inset-bottom));
+        z-index: 1;
+        display: flex;
+        gap: 6px;
+      }
+      /* a thin upright line keeps the sound button apart from the links */
+      .links .divider {
+        align-self: center;
+        width: 2px;
+        height: 20px;
+        margin: 0 4px;
+        background: #111;
+      }
+      /* The arrow is drawn on Tiny5's pixel grid (the font has no arrow of
+         its own) and nudges up and right on hover. */
+      .contact {
+        gap: 0.35em;
+        padding: 0 calc(0.6em - 2px);
+        font-family: "Tiny5", ui-monospace, monospace;
+        font-size: 15px;
+        line-height: 1;
+      }
+      .contact svg {
+        width: 0.7em;
+        height: 0.7em;
+        fill: currentColor;
+        shape-rendering: crispEdges;
+        transition: transform 150ms ease;
+      }
+      @media (hover: hover) {
+        .contact:hover svg {
+          transform: translate(0.12em, -0.12em);
+        }
+      }
+      /* The PLAY slideshow: clicking the Magic Choc opens it on the right.
+         Slide 1 is the full ice cream page (/icecream/) in a frame, on the
+         same yellow; the rest are placeholders. The arrows and count sit
+         in a column at the right edge. (src/home/icecream-view.js) */
+      .icecream-view {
+        position: absolute;
+        inset: 0;
+      }
+      /* the same margin on both sides, so the slides stay centred on the
+         right side and the ice cream sits exactly where it does in the list */
+      .slides {
+        position: absolute;
+        inset: 0 var(--nav-w);
+      }
+      iframe.slide {
+        display: block;
+        width: 100%;
+        height: 100%;
+        border: 0;
+        opacity: 0;
+        transition: opacity 400ms ease;
+      }
+      iframe.slide.is-loaded {
+        opacity: 1;
+      }
+      /* the card slide (src/card/card.js): the card fills it, with a soft
+         shadow beneath */
+      .slide-card {
+        position: absolute;
+        inset: 0;
+      }
+      .card-canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+        opacity: 0;
+        transition: opacity 400ms ease;
+        filter: drop-shadow(0 28px 32px rgba(40, 32, 10, 0.26)) drop-shadow(0 4px 6px rgba(40, 32, 10, 0.2));
+      }
+      .slide-card.is-live .card-canvas {
+        opacity: 1;
+      }
+      /* the Amplified Anvil slide (src/anvil/anvil.js): interactive 3D
+         hand cannon with a crisp studio shadow beneath */
+      .slide-anvil {
+        position: absolute;
+        inset: 0;
+      }
+      .anvil-canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+        opacity: 0;
+        transition: opacity 400ms ease;
+        filter: drop-shadow(0 30px 34px rgba(35, 38, 4, 0.30)) drop-shadow(0 5px 8px rgba(35, 38, 4, 0.22));
+      }
+      .slide-anvil.is-live .anvil-canvas {
+        opacity: 1;
+      }
+      /* the Demon-Destroyer Sword slide (src/sword/sword.js): ancient
+         forged dark-iron blade with a studio drop shadow beneath */
+      .slide-sword {
+        position: absolute;
+        inset: 0;
+      }
+      .sword-canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+        opacity: 0;
+        transition: opacity 400ms ease;
+        filter: drop-shadow(0 30px 34px rgba(35, 38, 4, 0.34)) drop-shadow(0 5px 8px rgba(35, 38, 4, 0.24));
+      }
+      .slide-sword.is-live .sword-canvas {
+        opacity: 1;
+      }
+      .slide-placeholder {
+        position: absolute;
+        /* about the size of the ice cream painting */
+        inset: 6vmin;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        border: 2px dashed #111;
+        font-family: "Tiny5", ui-monospace, monospace;
+        font-size: 15px;
+        color: #111;
+      }
+      .slide-placeholder span:first-child {
+        font-size: var(--menu-size);
+        line-height: 1;
+      }
+      /* the arrows show whenever PLAY does, slideshow open or not (and not
+         on phones, where the link just goes to /icecream/) */
+      .slide-nav {
+        display: none;
+      }
+      .stage:has(.list[data-list="PLAY"]:not([hidden]), .icecream-view) .slide-nav {
+        display: flex;
+      }
+      .slide-nav {
+        position: absolute;
+        z-index: 1;
+        right: var(--nav-right);
+        top: 50%;
+        translate: 0 -50%;
+        width: 64px;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+      }
+      /* square, and as wide as the "01 / 04" between them */
+      .slide-nav .box {
+        width: 38px;
+        height: 38px;
+        padding: 0;
+        cursor: pointer;
+      }
+      .slide-nav svg {
+        width: 14px;
+        height: 14px;
+        shape-rendering: crispEdges;
+      }
+      .slide-count {
+        font-family: "Tiny5", ui-monospace, monospace;
+        font-size: 13px;
+        line-height: 1;
+        color: #111;
+        white-space: nowrap;
+      }
+      /* the right side: the list (or the about text) fills it */
+      .stage {
+        --nav-right: clamp(16px, 2.5vw, 32px);
+        --nav-w: calc(var(--nav-right) + 64px);
+        position: relative;
+        height: 100%;
+        min-width: 0;
+      }
+      .list {
+        position: absolute;
+        inset: 0;
+        /* WORK and PLAY items snap a touch above the middle of the screen
+           (by --play-up) */
+        padding-top: calc(50dvh - var(--item-h) / 2 - var(--play-up));
+        padding-bottom: calc(50dvh - var(--item-h) / 2 + var(--play-up));
+        scroll-padding-bottom: calc(var(--play-up) * 2);
+      }
+      .about {
+        position: absolute;
+        inset: 0;
+        margin: 0;
+        display: flex;
+        /* "safe" keeps the top reachable when the text is taller than
+           the screen; it scrolls instead of being cut off */
+        align-items: safe center;
+        justify-content: center;
+        padding: 32px clamp(24px, 6vw, 96px);
+        /* centred on the menu: like the menu, centred in the space above
+           the CONTACT row */
+        padding-bottom: calc(32px + 56px + 30px + env(safe-area-inset-bottom) + var(--lift));
+        overflow-y: auto;
+      }
+      .about-text {
+        max-width: 60ch;
+      }
+      /* Phones: the column stays on the left, just smaller. */
+      @media (max-width: 640px) {
+        body {
+          --menu-size: 36px;
+          --item-h: min(50dvh, 440px);
+        }
+        .menu {
+          padding-left: 16px;
+          padding-right: 8px;
+        }
+        .links {
+          left: 16px;
+        }
+        .stage .slide-nav {
+          display: none;
+        }
+        .about {
+          padding: 24px 16px 24px 8px;
+        }
+        .about-text {
+          font-size: 13px;
+        }
+      }
+    </style>
   </head>
   <body>
-    <canvas id="scene" aria-label="A Magic Choc vanilla ice cream. Tap it to crack the chocolate shell; it melts slowly."></canvas>
-
-    <div class="controls">
-      <div class="weather" role="radiogroup" aria-label="Weather (how fast it melts)"></div>
+    <nav class="menu">
+      <button class="choice" type="button" aria-pressed="false" data-open="(" data-close=")">ABOUT</button>
+      <button class="choice" type="button" aria-pressed="true" data-open="*" data-close="*">PLAY</button>
+      <button class="choice" type="button" aria-pressed="false" data-open="[" data-close="]">WORK</button>
+    </nav>
+    <div class="links">
+      <!-- Placeholder address: replace with the real one (or a link). -->
+      <a class="box contact" href="mailto:hello@example.com">
+        CONTACT
+        <!-- a 7x7 pixel arrow: the head along the top and right, then a
+             stepped diagonal down to the bottom left -->
+        <svg viewBox="0 0 7 7" aria-hidden="true">
+          <rect x="2" y="0" width="5" height="1" />
+          <rect x="6" y="1" width="1" height="4" />
+          <rect x="5" y="1" width="1" height="1" />
+          <rect x="4" y="2" width="1" height="1" />
+          <rect x="3" y="3" width="1" height="1" />
+          <rect x="2" y="4" width="1" height="1" />
+          <rect x="1" y="5" width="1" height="1" />
+          <rect x="0" y="6" width="1" height="1" />
+        </svg>
+      </a>
+      <!-- X profile -->
+      <a class="box icon" href="https://x.com/junpk13" target="_blank" rel="noopener" aria-label="X">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path
+            d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"
+          />
+        </svg>
+      </a>
+      <!-- LinkedIn profile -->
+      <a class="box icon" href="https://www.linkedin.com/in/junpk" target="_blank" rel="noopener" aria-label="LinkedIn">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path
+            d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 1 1 0-4.125 2.062 2.062 0 0 1 0 4.125zM7.119 20.452H3.555V9h3.564v11.452z"
+          />
+        </svg>
+      </a>
+      <span class="divider" aria-hidden="true"></span>
+      <!-- Sound on/off for the whole site, the ice cream included. Pixel
+           speaker, with waves when on and a cross when off. -->
+      <button class="box icon sound" type="button" aria-label="Sound" aria-pressed="true">
+        <svg viewBox="0 0 9 7" aria-hidden="true">
+          <rect x="0" y="2" width="2" height="3" />
+          <rect x="2" y="1" width="1" height="5" />
+          <rect x="3" y="0" width="1" height="7" />
+          <g class="sound-on">
+            <rect x="5" y="2" width="1" height="3" />
+            <rect x="7" y="1" width="1" height="5" />
+          </g>
+          <g class="sound-off">
+            <rect x="5" y="2" width="1" height="1" />
+            <rect x="7" y="2" width="1" height="1" />
+            <rect x="6" y="3" width="1" height="1" />
+            <rect x="5" y="4" width="1" height="1" />
+            <rect x="7" y="4" width="1" height="1" />
+          </g>
+        </svg>
+      </button>
     </div>
-    <div class="flavors" aria-label="Ice cream flavor"></div>
-    <button class="sound-toggle" type="button" aria-label="Mute sounds" aria-pressed="false" title="Mute sounds">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z" /><path class="sound-waves" d="M16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11" /><path class="sound-off" d="m16 9 5 6m0-6-5 6" /></svg>
-    </button>
-    <button class="reset" type="button" aria-label="Get a new ice cream" hidden>
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3" /><path d="M4.5 4.5v3.2h3.2" /></svg>
-    </button>
-
-    <noscript><p class="fallback">Jun Park</p></noscript>
-    <p class="fallback fallback--webgl">Jun Park</p>
+    <main class="stage">
+      <ul class="list" data-list="WORK" aria-label="Work" hidden></ul>
+      <ul class="list" data-list="PLAY" aria-label="Play">
+        <li class="item">
+          <a class="live-choc" href="/icecream/" aria-label="Magic Choc ice cream">
+            <img src="/images/play/magic-choc.webp" width="453" height="1104" alt="" />
+            <canvas aria-hidden="true"></canvas>
+          </a>
+        </li>
+      </ul>
+      <section class="about" data-list="ABOUT" aria-label="About" hidden>
+        <div class="about-text">
+          <p>Hi, I'm Jun, a generalist product designer. I grew up in a small town in Sri Lanka and now live in Seoul.</p>
+          <p>I'm building <a class="oddware" href="https://oddware.xyz" target="_blank" rel="noopener">Oddware</a>, a product studio making consumer technology that's a little odd, but surprisingly useful and delightful.</p>
+          <p>Previously, I led growth at a consumer app and took it to over a million downloads and seven figures a year. Along the way, I realised what I loved most was designing and building products.</p>
+          <p>I've done it since I was a kid: cricket bats when we couldn't afford the good ones, spice packaging for my dad, a pizzeria that never served a slice. Now I'm all in.</p>
+        </div>
+      </section>
+    </main>
   </body>
 </html>

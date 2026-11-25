@@ -3,6 +3,7 @@ import { Renderer } from "./render/renderer.js";
 import { engravingCanvas } from "./render/engraving.js";
 import { CrackAudio } from "./audio/crack.js";
 import { WeatherAudio } from "./audio/weather.js";
+import { onSoundChange, setSoundOn, soundOn } from "./sound-setting.js";
 import { WeatherPicker } from "./ui/weather.js";
 import { Dock } from "./ui/dock.js";
 import { Maker, loadRecipes, makeFlavor, saveRecipes } from "./ui/maker.js";
@@ -39,6 +40,25 @@ try {
   document.body.classList.add("no-webgl");
 }
 
+// Inside the home page the page keeps that page's colour (its frame's data-page)
+// instead of white, so the ice cream sits on the same yellow.
+let pageColor;
+try {
+  pageColor = window.frameElement?.dataset.page;
+} catch {
+  // a frame on another site
+}
+if (pageColor && /^#[0-9a-f]{6}$/i.test(pageColor)) {
+  document.documentElement.classList.add("on-page");
+  document.documentElement.style.background = pageColor;
+  document.body.style.background = pageColor;
+  if (renderer) {
+    renderer.pageColor = [1, 3, 5].map((i) => parseInt(pageColor.slice(i, i + 2), 16) / 255);
+    // a touch wider than on its own page
+    renderer.sideInset = 0.042;
+  }
+}
+
 const audio = new CrackAudio();
 const ambience = new WeatherAudio(() => audio.ensure(), WEATHER_DEFAULT);
 const fracture = new Fracture();
@@ -72,6 +92,11 @@ const weather = new WeatherPicker(weatherRoot, {
   },
 });
 
+// Start muted or not, as the site-wide sound switch says.
+audio.muted = !soundOn();
+soundBtn.setAttribute("aria-pressed", String(audio.muted));
+soundBtn.title = audio.muted ? "Turn sounds on" : "Mute sounds";
+
 // Browsers require a gesture before playing audio. Start with the current
 // weather on the first interaction, then follow the picker until muted.
 function startSound() {
@@ -80,12 +105,24 @@ function startSound() {
 }
 window.addEventListener("pointerdown", startSound, { once: true });
 window.addEventListener("keydown", startSound, { once: true });
-soundBtn.addEventListener("click", () => {
-  audio.muted = !audio.muted;
+// Shown inside the home page (in a frame opened by a click there), the browser
+// may already allow sound, so start the weather straight away rather than
+// waiting for a click inside the frame. Where it doesn't, the context stays
+// suspended and the first click above resumes it.
+if (window.parent !== window) startSound();
+// Sound follows the site-wide switch (src/sound-setting.js): this button
+// flips it, and a change made elsewhere (the sound button on the home page, when
+// this page is open in its frame) is followed here.
+function applySound(on) {
+  audio.muted = !on;
   soundBtn.setAttribute("aria-pressed", String(audio.muted));
   soundBtn.title = audio.muted ? "Turn sounds on" : "Mute sounds";
-  ambience.setEnabled(!audio.muted);
-});
+  ambience.setEnabled(on);
+}
+soundBtn.addEventListener("click", () => setSoundOn(audio.muted));
+onSoundChange(applySound);
+// Inside the home page the page's own sound button does the job, so this one hides.
+if (window.parent !== window) soundBtn.style.display = "none";
 document.addEventListener("visibilitychange", () => ambience.setHidden(document.hidden));
 
 // --------------------------------------------------------------- camera ----
@@ -96,8 +133,16 @@ function updateCamera() {
   const w = canvas.clientWidth || window.innerWidth;
   const h = canvas.clientHeight || window.innerHeight;
   const aspect = w / h;
-  const needH = 15.3 / 0.64;
-  const needW = 7.2 / 0.78;
+  // Inside the home page the page can be asked to show the ice cream bigger than it
+  // fits by default (its frame's data-zoom), to match the PLAY list.
+  let zoom = 1;
+  try {
+    zoom = Number(window.frameElement?.dataset.zoom) || 1;
+  } catch {
+    // a frame on another site: no zoom
+  }
+  const needH = 15.3 / 0.64 / zoom;
+  const needW = 7.2 / 0.78 / zoom;
   const D = Math.max(needH / (2 * TAN), needW / (2 * TAN * aspect));
   cam.D = D;
   const elev = 0.09;
@@ -111,6 +156,15 @@ function updateCamera() {
   cam.fwd = f;
   cam.aspect = aspect;
   cam.floorY = -D * TAN - 1;
+  // The home page can ask for the ice cream a little higher (data-raise, in this
+  // page's pixels), to line it up with its list; in world units at its depth
+  let raise = 0;
+  try {
+    raise = Number(window.frameElement?.dataset.raise) || 0;
+  } catch {
+    // a frame on another site
+  }
+  cam.raise = (raise * 2 * D * TAN) / h;
 }
 
 function cross(a, b) {
@@ -162,7 +216,7 @@ function updateWorld() {
   const drop = (1 - a) * 26;
   world.pos = {
     x: state.shake * 0.03 * Math.sin(t * 77),
-    y: -OBJ_CENTER_Y + OBJ_Y_OFFSET + bob + drop,
+    y: -OBJ_CENTER_Y + OBJ_Y_OFFSET + (cam.raise || 0) + bob + drop,
     z: 0,
   };
 }
@@ -359,6 +413,8 @@ const dock = new Dock(dockRoot, {
   },
   onAdd: () => maker.toggle(),
 });
+// Inside the home page the reset sits at the end of the flavour row.
+if (document.documentElement.classList.contains("on-page")) dockRoot.append(resetBtn);
 
 // "create your own": pick a shape, coating and flavour; it joins the row
 const sceneStill = document.createElement("canvas");
@@ -621,12 +677,49 @@ function frame(now) {
 function updateLayout() {
   updateCamera();
   const shortSide = Math.min(canvas.clientWidth, canvas.clientHeight);
-  const headerBottom = controls.getBoundingClientRect().bottom;
-  backdropInsetTop = Math.min(
-    Math.max(0.055 * shortSide, headerBottom + 0.024 * shortSide + 5),
-    0.24 * canvas.clientHeight,
-  );
-  backdropInsetBottom = Math.max(0, backdropInsetTop - 16);
+  if (document.documentElement.classList.contains("on-page")) {
+    // On a coloured page (inside the home page) the weather words sit inside the
+    // painting, near its top edge. The painting has the same margin top and
+    // bottom, a little smaller than on its own page.
+    const margin = 0.032 * shortSide;
+    const rowMargin = 0.055 * shortSide;
+    backdropInsetTop = margin;
+    backdropInsetBottom = margin;
+    // Where the words and flavours would sit by default…
+    let topRow = rowMargin + 0.04 * shortSide + 8;
+    // the bottom of the words' letters, below the top of the row (the word
+    // boxes have padding and room for descenders under them)
+    const word = controls.querySelector(".weather-word");
+    const rowH = word
+      ? word.getBoundingClientRect().bottom - controls.getBoundingClientRect().top - 4 - 0.25 * parseFloat(getComputedStyle(word).fontSize)
+      : controls.offsetHeight;
+    const dockH = dockRoot.offsetHeight || 26; // (26: one circle, before they are added)
+    let dockTop = canvas.clientHeight - rowMargin - 41 - dockH;
+    // …then both move by the same amount so the gap from the words down to
+    // the ice cream equals the gap from the ice cream down to the flavours.
+    let iceTop = NaN;
+    let iceBottom = NaN;
+    try {
+      iceTop = Number(window.frameElement?.dataset.iceTop);
+      iceBottom = Number(window.frameElement?.dataset.iceBottom);
+    } catch {
+      // a frame on another site
+    }
+    if (iceTop && iceBottom) {
+      const delta = (iceTop + iceBottom) / 2 - (topRow + rowH + dockTop) / 2;
+      topRow += delta;
+      dockTop += delta;
+      document.documentElement.style.setProperty("--dock-top", `${dockTop}px`);
+    }
+    document.documentElement.style.setProperty("--top-row", `${topRow}px`);
+  } else {
+    const headerBottom = controls.getBoundingClientRect().bottom;
+    backdropInsetTop = Math.min(
+      Math.max(0.055 * shortSide, headerBottom + 0.024 * shortSide + 5),
+      0.24 * canvas.clientHeight,
+    );
+    backdropInsetBottom = Math.max(0, backdropInsetTop - 16);
+  }
   const viewportInsetBottom = backdropInsetBottom - canvas.getBoundingClientRect().top;
   document.documentElement.style.setProperty("--backdrop-inset-bottom", `${viewportInsetBottom}px`);
 }
@@ -669,5 +762,8 @@ window.__ice = {
   renew: newIceCream,
   // try a picker framing: __ice.swatch(0, { x, y, half }) -> image URL
   swatch: (i, sw) => renderSwatch(FLAVORS[i], sw),
+  // render a framed still on a transparent background (used to make the
+  // home page's Magic Choc image): __ice.view(0, { x, y, half, yaw, w, h }) -> canvas
+  view: (i, opts) => renderView(FLAVORS[i], opts),
   fracture,
 };

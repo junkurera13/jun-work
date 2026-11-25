@@ -7,6 +7,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: resolve(import.meta.dirname, "index.html"),
+        icecream: resolve(import.meta.dirname, "icecream/index.html"),
         archive: resolve(import.meta.dirname, "archive/index.html"),
         pluck: resolve(import.meta.dirname, "pluck/index.html"),
       },

@@ -132,6 +132,18 @@ body {
   color: #5f5a55;
 }
 
+/* On a coloured page (the yellow of the home page), the pale greys wash out, so
+   the words are the site's near-black, faded when not chosen. */
+.on-page .weather-word {
+  color: rgba(17, 17, 17, 0.5);
+}
+.on-page .weather-word:hover {
+  color: rgba(17, 17, 17, 0.75);
+}
+.on-page .weather-word.is-on {
+  color: #111;
+}
+
 .weather-word:focus-visible {
   outline: none;
   text-decoration: underline;
@@ -669,4 +681,41 @@ noscript .fallback,
   .reset {
     transition: none;
   }
+}
+
+/* ------------------------------------------------------ on a coloured page --- */
+/* Inside the home page (html.on-page) the controls sit inside the painting: the
+   weather words centred along its top, and the flavour circles centred
+   along the bottom, with the reset just after the last circle (main.js
+   moves it into their row; it hangs off the end, so the circles stay
+   centred whether it shows or not).
+   --top-row is set by updateLayout() in main.js. */
+.on-page .controls {
+  top: var(--top-row);
+  /* centred, like the flavour circles below */
+  justify-content: safe center;
+}
+.on-page .reset {
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  right: auto;
+  bottom: auto;
+  margin-left: 12px;
+  translate: 0 -50%;
+}
+.on-page .dock {
+  left: 50%;
+  translate: -50% 0;
+}
+/* placed by updateLayout() so the gaps above and below the ice cream match */
+html.on-page[style*="--dock-top"] .dock {
+  top: var(--dock-top);
+  bottom: auto;
+}
+
+/* Making your own ice cream is hidden for now (the plus circle at the end
+   of the flavour row). Remove this rule to bring it back. */
+.dock-add {
+  display: none;
 }

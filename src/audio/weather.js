@@ -1,5 +1,7 @@
-// A quiet, looping soundscape for each weather. Sounds are loaded on demand,
-// and the old weather fades into the new one instead of cutting abruptly.
+// A quiet, looping soundscape for each weather. The starting weather's file
+// is fetched as soon as the page loads (so the sound can begin the moment
+// audio is allowed); the rest load on demand. The old weather fades into
+// the new one instead of cutting abruptly.
 const TRACKS = ["snow", "rain", "breeze", "sunshine", "heatwave"];
 const LEVEL = 0.22;
 const FADE_SECONDS = 1.2;
@@ -13,18 +15,32 @@ export class WeatherAudio {
     this.current = null;
     this.tracks = new Set();
     this.buffers = new Map();
+    this.bytes = new Map();
     this.version = 0;
+    this.prefetch(value);
+  }
+
+  // Download a track's file (decoding needs an audio context, which waits
+  // for the visitor's first click).
+  prefetch(index) {
+    if (!this.bytes.has(index)) {
+      const path = `/audio/weather/${TRACKS[index]}.mp3`;
+      const pending = fetch(path).then((response) => {
+        if (!response.ok) throw new Error(`Could not load ${path}`);
+        return response.arrayBuffer();
+      });
+      pending.catch(() => this.bytes.delete(index));
+      this.bytes.set(index, pending);
+    }
+    return this.bytes.get(index);
   }
 
   async bufferFor(index, ctx) {
     if (!this.buffers.has(index)) {
-      const path = `/audio/weather/${TRACKS[index]}.mp3`;
-      const pending = fetch(path)
-        .then((response) => {
-          if (!response.ok) throw new Error(`Could not load ${path}`);
-          return response.arrayBuffer();
-        })
-        .then((data) => ctx.decodeAudioData(data))
+      const pending = this.prefetch(index)
+        // decodeAudioData detaches the bytes, so decode a copy (the bytes
+        // stay cached in case decoding has to run again)
+        .then((data) => ctx.decodeAudioData(data.slice(0)))
         .catch((error) => {
           this.buffers.delete(index);
           throw error;

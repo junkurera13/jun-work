@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------------
 // The painted weather backdrop: a soft, grainy, painterly panel whose rounded
-// edges dissolve into the white page. Five simple skies, cross-faded by
+// edges dissolve into the page (white, or uPage). Five simple skies, cross-faded by
 // weight: snowy, rainy, normal, summer, brutal summer.
 // Needs common.glsl (hash / noise) and: uRes, uTime, uWeatherA, uWeatherB.
 // ---------------------------------------------------------------------------
@@ -8,6 +8,8 @@
 uniform vec4 uWeatherA; // snow, rain, normal, summer
 uniform float uWeatherB; // brutal summer
 uniform vec2 uBackdropInsetsY; // top and bottom margins in render pixels
+uniform vec3 uPage; // the page colour around the panel (white; yellow inside the home page)
+uniform float uSideInset; // left and right margins, as a fraction of the short side
 
 float fbm2(vec2 p) {
   float a = 0.5;
@@ -115,14 +117,14 @@ vec3 background(vec2 fc) {
   float bottom = uBackdropInsetsY.y;
   float top = uRes.y - uBackdropInsetsY.x;
   vec2 c = vec2(0.5 * uRes.x, 0.5 * (top + bottom));
-  vec2 hs = vec2(c.x - 0.055 * m, 0.5 * (top - bottom));
+  vec2 hs = vec2(c.x - uSideInset * m, 0.5 * (top - bottom));
   float r = 0.07 * m;
   float blur = 0.04 * m;
   vec2 q = fc / m;
   // watercolour-ish ragged edge that bleeds into the white page
   float edge = sdRoundRect(fc - c, hs, r) + (fbm2(q * 7.0) - 0.5) * blur * 1.2;
   float mask = 1.0 - smoothstep(-blur, blur * 0.4, edge);
-  if (mask <= 0.0) return vec3(1.0);
+  if (mask <= 0.0) return uPage;
 
   vec2 uv = (fc - (c - hs)) / (2.0 * hs);
   float t = uTime;
@@ -140,5 +142,5 @@ vec3 background(vec2 fc) {
   col *= 0.93 + 0.12 * fbm2(q * 3.2 + 4.0);
   col += (hash12(fc) - 0.5) * 0.045 + (vnoise2(fc * 0.35) - 0.5) * 0.025;
   col = mix(col, vec3(1.0), 0.14);
-  return mix(vec3(1.0), clamp(col, 0.0, 1.0), mask);
+  return mix(uPage, clamp(col, 0.0, 1.0), mask);
 }

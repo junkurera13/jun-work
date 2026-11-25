@@ -21,11 +21,22 @@ function compile(gl, type, src) {
 }
 
 export class Renderer {
-  constructor(canvas) {
+  /**
+   * transparent: draw the ice cream alone on a see-through canvas (no
+   * weather backdrop), e.g. the live one on the home page. The shader then
+   * writes straight (not premultiplied) alpha, as it does for thumbnails.
+   */
+  constructor(canvas, { transparent = false } = {}) {
     this.canvas = canvas;
+    this.transparent = transparent;
+    // the page colour around the weather panel (see background.glsl)
+    this.pageColor = [1, 1, 1];
+    // the painting's left and right margins, as a fraction of the short side
+    this.sideInset = 0.055;
     const gl = canvas.getContext("webgl2", {
       antialias: false,
-      alpha: false,
+      alpha: transparent,
+      premultipliedAlpha: !transparent,
       depth: false,
       stencil: false,
       powerPreference: "high-performance",
@@ -109,7 +120,7 @@ export class Renderer {
     gl.uniform1i(this.u.uDyn, 1);
     gl.uniform1i(this.u.uTextTex, 2);
     this.bu = {};
-    for (const name of ["uRes", "uTime", "uWeatherA", "uWeatherB", "uBackdropInsetsY"]) this.bu[name] = gl.getUniformLocation(this.bgProg, name);
+    for (const name of ["uRes", "uTime", "uWeatherA", "uWeatherB", "uBackdropInsetsY", "uPage", "uSideInset"]) this.bu[name] = gl.getUniformLocation(this.bgProg, name);
   }
 
   floatTex(w, h) {
@@ -211,19 +222,27 @@ export class Renderer {
     const W = this.canvas.width;
     const H = this.canvas.height;
     const scaleY = H / Math.max(1, this.canvas.clientHeight);
-    const backdropTop = U.backdropInsetTop * scaleY;
-    const backdropBottom = U.backdropInsetBottom * scaleY;
+    const backdropTop = (U.backdropInsetTop ?? 0) * scaleY;
+    const backdropBottom = (U.backdropInsetBottom ?? 0) * scaleY;
     gl.viewport(0, 0, W, H);
     gl.disable(gl.SCISSOR_TEST);
     gl.bindVertexArray(this.vao);
-    // 1. the painted weather backdrop, full screen
-    gl.useProgram(this.bgProg);
-    gl.uniform2f(this.bu.uRes, W, H);
-    gl.uniform1f(this.bu.uTime, U.time);
-    gl.uniform4fv(this.bu.uWeatherA, U.weatherA);
-    gl.uniform1f(this.bu.uWeatherB, U.weatherB);
-    gl.uniform2f(this.bu.uBackdropInsetsY, backdropTop, backdropBottom);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    if (this.transparent) {
+      // 1. nothing behind it
+      gl.clearColor(0, 0, 0, 0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+    } else {
+      // 1. the painted weather backdrop, full screen
+      gl.useProgram(this.bgProg);
+      gl.uniform2f(this.bu.uRes, W, H);
+      gl.uniform1f(this.bu.uTime, U.time);
+      gl.uniform4fv(this.bu.uWeatherA, U.weatherA);
+      gl.uniform1f(this.bu.uWeatherB, U.weatherB);
+      gl.uniform2f(this.bu.uBackdropInsetsY, backdropTop, backdropBottom);
+      gl.uniform3fv(this.bu.uPage, this.pageColor);
+      gl.uniform1f(this.bu.uSideInset, this.sideInset);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+    }
     // 2. the ice cream, only where it can be
     if (scissor) {
       const x0 = Math.max(0, Math.floor(scissor[0] * W));
@@ -234,7 +253,7 @@ export class Renderer {
       gl.enable(gl.SCISSOR_TEST);
       gl.scissor(x0, y0, x1 - x0, y1 - y0);
     }
-    this.drawScene(U, W, H, backdropTop, backdropBottom, false);
+    this.drawScene(U, W, H, backdropTop, backdropBottom, this.transparent);
   }
 
   /**
@@ -281,6 +300,8 @@ export class Renderer {
     gl.uniform4fv(u.uWeatherA, U.weatherA);
     gl.uniform1f(u.uWeatherB, U.weatherB);
     gl.uniform2f(u.uBackdropInsetsY, backdropTop, backdropBottom);
+    if (u.uPage) gl.uniform3fv(u.uPage, this.pageColor);
+    if (u.uSideInset) gl.uniform1f(u.uSideInset, this.sideInset);
     gl.uniform3fv(u.uLightTint, U.lightTint);
     gl.uniform3f(u.uCamPos, U.camPos.x, U.camPos.y, U.camPos.z);
     gl.uniformMatrix3fv(u.uCamBasis, false, U.camBasis);
