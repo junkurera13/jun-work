@@ -1531,11 +1531,10 @@ iframe.slide {
     align-items: center;
     width: auto;
     gap: 0;
-    /* the words are inset by a marker's width, so a marker lands on the
-       same edges as the CONTACT row below */
-    --hang: calc(var(--menu-size) * 0.375);
-    padding: calc(14px + env(safe-area-inset-top)) calc(var(--side) + var(--hang) + env(safe-area-inset-right)) 10px
-      calc(var(--side) + var(--hang) + env(safe-area-inset-left));
+    /* the same side margin as the CONTACT row, so the row spans the
+       same width as the bar at the bottom */
+    padding: calc(14px + env(safe-area-inset-top)) calc(var(--side) + env(safe-area-inset-right)) 10px
+      calc(var(--side) + env(safe-area-inset-left));
   }
   /* Taller tap targets without moving the words: the padding reaches
      into the space around them. */
@@ -1543,21 +1542,8 @@ iframe.slide {
     padding-block: 10px;
     margin-block: -10px;
   }
-  /* The markers hang outside the word again (as in home.css), so the
-     row never shifts when the selection changes. Only one word is
-     marked at a time, so a gap only ever has to fit one marker. */
-  .choice::before,
-  .choice::after {
-    position: absolute;
-    top: 10px;
-    display: inline;
-    opacity: 0;
-    will-change: opacity;
-  }
-  .choice[aria-pressed="true"]::before,
-  .choice[aria-pressed="true"]::after {
-    opacity: 1;
-  }
+  /* (The markers sit in the line, as on desktop, so the first and last
+     glyphs always land on the row's edges, whichever word is marked.) */
   .stage {
     grid-area: 2 / 1;
     /* the PLAY items size themselves to the space left (cqh) */
@@ -1692,8 +1678,6 @@ iframe.slide {
     --menu-size: 48px;
   }
   .menu {
-    justify-content: flex-start;
-    gap: 56px;
     padding-top: calc(24px + env(safe-area-inset-top));
     padding-bottom: 16px;
   }
