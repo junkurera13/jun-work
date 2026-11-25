@@ -70,8 +70,16 @@ const playType = (word) => {
 
 const playSelect = (word) => sounds[word].select(audio().currentTime);
 
+// Chrome sometimes leaves a thin column of a hidden letter or marker on
+// screen: it only repaints the glyph's own box, not the soft edge beside
+// it. Changing the menu's (invisible) background makes it repaint the
+// whole menu, which clears any such leftover. See .menu in layout.css.
+const repaint = (menu) => menu?.classList.toggle("is-flushed");
+
 export function setupChoices() {
   const choices = document.querySelectorAll(".choice");
+  const menu = document.querySelector(".menu");
+  menu?.addEventListener("animationend", () => repaint(menu));
   const lists = document.querySelectorAll("[data-list]");
   for (const choice of choices) {
     const word = choice.textContent.trim();
@@ -88,11 +96,14 @@ export function setupChoices() {
 
     choice.addEventListener("pointerenter", (e) => {
       if (e.pointerType === "mouse") playType(word);
+      repaint(menu);
     });
+    choice.addEventListener("pointerleave", () => repaint(menu));
     choice.addEventListener("click", () => {
       playSelect(word);
       for (const c of choices) c.setAttribute("aria-pressed", String(c === choice));
       for (const list of lists) list.hidden = list.dataset.list !== word;
+      repaint(menu);
     });
   }
 }

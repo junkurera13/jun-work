@@ -9,9 +9,17 @@ body {
   grid-template-columns: auto 1fr;
   /* the same size as WORK and PLAY on the original layout */
   --menu-size: clamp(36px, 7vw, 104px);
+  /* Tiny5 is drawn on 8 pixels to the em, so at a multiple of 8px and a
+     whole-pixel left edge every square lands on whole screen pixels. Off
+     the grid, its soft edges were left behind on screen as thin lines
+     when a letter or marker hid (Chrome doesn't repaint that far). */
+  --menu-size: round(clamp(40px, 7vw, 104px), 8px);
+  --menu-left: clamp(24px, 6vw, 96px);
+  --menu-left: round(clamp(24px, 6vw, 96px), 1px);
   /* lifts the menu and the content a little above the centre of the
      space over the CONTACT row (they move up by half of this) */
   --lift: 12dvh;
+  --lift: round(12dvh, 2px);
   /* the PLAY ice cream (and WORK items) a bit bigger than on / */
   --item-h: min(70dvh, 630px);
   /* how far the PLAY items (and the ice cream slide) sit above the
@@ -25,12 +33,22 @@ body {
   flex-direction: column;
   justify-content: center;
   align-items: flex-start;
-  gap: calc(var(--menu-size) * 0.3);
+  gap: round(calc(var(--menu-size) * 0.3), 1px);
   width: calc(var(--menu-size) * 4.2);
-  padding: 0 12px 0 clamp(24px, 6vw, 96px);
+  padding: 0 12px 0 var(--menu-left);
   /* centred in the space above the CONTACT row (its 56px offset
      plus its 30px height) */
   padding-bottom: calc(56px + 30px + env(safe-area-inset-bottom) + var(--lift));
+}
+/* A background too faint to show (it rounds to nothing on screen), but
+   real to Chrome: src/home/choices.js swaps it whenever a letter or
+   marker hides, so the whole menu is repainted and no thin edge of the
+   hidden glyph is left behind. */
+.menu {
+  background-color: color(srgb 0 0 0 / 0.001);
+}
+.menu.is-flushed {
+  background-color: color(srgb 0 0 0 / 0.0011);
 }
 .choice {
   font-size: var(--menu-size);
@@ -54,7 +72,7 @@ body {
    the left column, its left edge on the menu's left edge. */
 .links {
   position: fixed;
-  left: clamp(24px, 6vw, 96px);
+  left: var(--menu-left);
   bottom: calc(56px + env(safe-area-inset-bottom));
   z-index: 1;
   display: flex;
@@ -258,7 +276,7 @@ iframe.slide {
 /* Phones: the column stays on the left, just smaller. */
 @media (max-width: 640px) {
   body {
-    --menu-size: 36px;
+    --menu-size: 40px;
     --item-h: min(50dvh, 440px);
   }
   .menu {
