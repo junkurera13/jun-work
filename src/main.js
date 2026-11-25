@@ -686,7 +686,10 @@ function updateLayout() {
     backdropInsetTop = margin;
     backdropInsetBottom = margin;
     // Where the words and flavours would sit by default…
-    let topRow = rowMargin + 0.04 * shortSide + 8;
+    // (A tall, narrow frame, on a phone, keeps both rows close to the
+    // painting's edges, so the ice cream has the room between them.)
+    const tall = canvas.clientHeight > canvas.clientWidth * 1.4;
+    let topRow = tall ? margin + 10 : rowMargin + 0.04 * shortSide + 8;
     // the bottom of the words' letters, below the top of the row (the word
     // boxes have padding and room for descenders under them)
     const word = controls.querySelector(".weather-word");
@@ -694,7 +697,7 @@ function updateLayout() {
       ? word.getBoundingClientRect().bottom - controls.getBoundingClientRect().top - 4 - 0.25 * parseFloat(getComputedStyle(word).fontSize)
       : controls.offsetHeight;
     const dockH = dockRoot.offsetHeight || 26; // (26: one circle, before they are added)
-    let dockTop = canvas.clientHeight - rowMargin - 41 - dockH;
+    let dockTop = canvas.clientHeight - (tall ? margin + 14 : rowMargin + 41) - dockH;
     // …then both move by the same amount so the gap from the words down to
     // the ice cream equals the gap from the ice cream down to the flavours.
     let iceTop = NaN;

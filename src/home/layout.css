@@ -1548,7 +1548,7 @@ iframe.slide {
     grid-area: 2 / 1;
     /* the PLAY items size themselves to the space left (cqh) */
     container-type: size;
-    --item-h: min(calc((100cqh - var(--nav-h)) * 0.76), 600px);
+    --item-h: min(calc((100cqh - var(--nav-h)) * 0.68), 600px);
   }
   .links {
     grid-area: 3 / 1;
