@@ -1648,7 +1648,8 @@ iframe.slide {
      buttons step aside */
   .work-canvas:not(.is-fullscreen) {
     --canvas-inset: 0px;
-    inset: 4px max(12px, calc(var(--side) - 8px));
+    /* the same side margin as the menu's markers and the CONTACT row */
+    inset: 4px calc(var(--side) + env(safe-area-inset-right)) 4px calc(var(--side) + env(safe-area-inset-left));
     border-radius: 14px;
   }
   .work-canvas {
