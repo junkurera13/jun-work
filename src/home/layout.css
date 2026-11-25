@@ -25,6 +25,10 @@ body {
   /* how far the PLAY items (and the ice cream slide) sit above the
      exact middle */
   --play-up: 0.5dvh;
+  /* and how far left of the right side's centre: the menu column is
+     wider than its words and the arrows take the far right, so dead
+     centre read as a touch too far right */
+  --play-left: clamp(12px, 2.5vw, 40px);
 }
 /* The left column. Its width is fixed to fit the widest entry,
    "(ABOUT)", so the right side never moves when the selection does. */
@@ -123,6 +127,12 @@ body {
 .slides {
   position: absolute;
   inset: 0 var(--nav-w);
+  translate: calc(var(--play-left) * -1) 0;
+}
+/* the PLAY list moves by the same amount, so the ice cream doesn't
+   jump when the slideshow opens */
+.list[data-list="PLAY"] {
+  translate: calc(var(--play-left) * -1) 0;
 }
 /* Every slide reveals the same way: hidden until it has drawn
    (src/home/icecream-view.js adds .is-shown), then one fade. */
@@ -281,6 +291,8 @@ iframe.slide {
   body {
     --menu-size: 40px;
     --item-h: min(50dvh, 440px);
+    /* no arrows on phones, so nothing to balance */
+    --play-left: 0px;
   }
   .menu {
     padding-left: 16px;
