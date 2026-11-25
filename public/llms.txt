@@ -1,0 +1,26 @@
+# Jun Park
+
+> A generalist product designer building Oddware, a product studio making oddly useful and delightful consumer technology.
+
+I grew up in a small town in Sri Lanka and now live in Seoul. In 2023, I came to Seoul with just $240. I skipped classes and nearly got kicked out of uni to work at a pizzeria, all to fund ads for my dropshipping stores. That got me a role leading growth at a consumer app, which hit over a million downloads and seven figures a year. Along the way, I realised what I loved most was designing and building products.
+
+Site: https://jun.oddware.xyz/
+
+## Work
+
+- [Oddware Gizmo 1](https://gizmo.oddware.xyz/device): A handheld, agent-first computer for kids. Hardware, OS, web, 2026.
+- [Oddbox Kids](https://gizmo.oddware.xyz): A software pivot from Gizmo 1: interactive stories kids don’t just watch, but step inside. Product, brand, motion, web, 2026.
+- [Slate](https://slate.oddware.xyz): A personal desktop agent that does the work by becoming the interface. Agent, macOS & Windows, instruments, web, 2026.
+- [Cast](https://getcast.xyz): Generate campaign-ready creative assets with real, licensed models. Landing, web app, brand, 2026.
+- [Omurice](https://omu-rice.vercel.app): A 1930s cartoon line-cook trial built around a Three.js fluid-physics kitchen. Score over 90 and Chef Okada hires you. 3D game, Three.js, physics, 2026.
+- [Oddware](https://oddware.xyz): A product studio making oddly useful and delightful consumer technology.
+
+## Play
+
+- [Magic Choc ice cream](https://jun.oddware.xyz/icecream/)
+
+## Contact
+
+- Email: parkjundk@gmail.com
+- X: https://x.com/junpk13
+- LinkedIn: https://www.linkedin.com/in/junpk
