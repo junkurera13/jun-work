@@ -21,29 +21,34 @@ const TEA = [0.8, 0.52, 0.06]; // what the water steeps toward
 const ease = (t) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
 const clamp01 = (t) => Math.max(0, Math.min(1, t));
 
+// The scene is built once and kept for the life of the page: building it
+// and compiling its glass and water shaders is what takes the time, so the
+// slideshow starts it in the background (prepareTea) and every visit after
+// that just puts the canvas back and starts it fresh.
+let shared;
+export const prepareTea = () => (shared ??= build().catch(() => (shared = null)));
+
 export function mountTea(host) {
   let destroyed = false;
-  let cleanup = () => {};
-  init(host, () => destroyed).then((c) => {
-    if (destroyed) c?.();
-    else if (c) cleanup = c;
+  let detach = () => {};
+  prepareTea().then((tea) => {
+    if (!destroyed && tea) detach = tea.attach(host);
   });
   return {
     destroy() {
       destroyed = true;
-      cleanup();
+      detach();
     },
   };
 }
 
-async function init(host, gone) {
+async function build() {
   const [THREE, { RoomEnvironment }, { RoundedBoxGeometry }] = await Promise.all([
     import("three"),
     import("three/addons/environments/RoomEnvironment.js"),
     import("three/addons/geometries/RoundedBoxGeometry.js"),
     document.fonts?.ready,
   ]);
-  if (gone()) return null;
   const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 
   // ---- renderer, scene, camera ----
@@ -54,15 +59,14 @@ async function init(host, gone) {
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   const canvas = renderer.domElement;
   canvas.className = "tea-canvas";
-  canvas.style.cssText = "display:block;width:100%;height:100%;cursor:pointer;opacity:0;transition:opacity 500ms ease;outline:none";
+  canvas.style.cssText = "display:block;width:100%;height:100%;cursor:pointer;outline:none";
   canvas.setAttribute("role", "button");
   canvas.setAttribute("aria-label", "Put the teabag in the cup");
   canvas.tabIndex = 0;
-  host.append(canvas);
+  let host = null;
 
   const scene = new THREE.Scene();
-  const page = getComputedStyle(document.documentElement).getPropertyValue("--page").trim() || "#efff47";
-  scene.background = new THREE.Color(page);
+  scene.background = new THREE.Color("#efff47");
   const pmrem = new THREE.PMREMGenerator(renderer);
   const room = new RoomEnvironment();
   scene.environment = pmrem.fromScene(room, 0.04).texture;
@@ -88,12 +92,10 @@ async function init(host, gone) {
   ground.receiveShadow = true;
   scene.add(ground);
 
-  const disposables = [];
   const tex = (c) => {
     const t = new THREE.CanvasTexture(c);
     t.colorSpace = THREE.SRGBColorSpace;
     t.anisotropy = renderer.capabilities.getMaxAnisotropy();
-    disposables.push(t);
     return t;
   };
 
@@ -339,20 +341,35 @@ async function init(host, gone) {
   });
 
   // ---- state ----
-  let phase = "rest"; // rest, moving, steeping
-  let t = 0; // time into the move
-  let plopped = false;
-  let steep = 0;
-  let wet = 0;
-  let swirl = 0;
-  let dunk = -1;
-  let hover = 0;
-  let hoverTarget = 0;
+  let phase, t, plopped, steep, wet, swirl, dunk, hover, hoverTarget;
   const pointer = { x: 0, y: 0, ex: 0, ey: 0 };
-  const bagTop = REST_TOP.clone();
-  const bagQ = REST_Q.clone();
-  const tagPos = TAG_REST.clone();
-  const tagQ = TAG_REST_Q.clone();
+  const bagTop = V();
+  const bagQ = new THREE.Quaternion();
+  const tagPos = V();
+  const tagQ = new THREE.Quaternion();
+  // back to the start: the bag on the box, the water clear
+  function reset() {
+    phase = "rest"; // rest, moving, steeping
+    t = 0; // time into the move
+    plopped = false;
+    steep = wet = swirl = hover = hoverTarget = 0;
+    dunk = -1;
+    Object.assign(pointer, { x: 0, y: 0, ex: 0, ey: 0 });
+    bagTop.copy(REST_TOP);
+    bagQ.copy(REST_Q);
+    tagPos.copy(TAG_REST);
+    tagQ.copy(TAG_REST_Q);
+    for (const d of dye) {
+      d.userData.life = 1;
+      d.visible = false;
+    }
+    for (const r of ripples) {
+      r.userData.t = null;
+      r.material.opacity = 0;
+    }
+    canvas.setAttribute("aria-label", "Put the teabag in the cup");
+  }
+  reset();
 
   function spawnDye() {
     const s = dye.find((d) => d.userData.life >= 1);
@@ -568,19 +585,16 @@ async function init(host, gone) {
     dist = hi;
   }
   function resize() {
-    const w = Math.max(1, host.clientWidth);
-    const h = Math.max(1, host.clientHeight);
+    const w = Math.max(1, host?.clientWidth || 400);
+    const h = Math.max(1, host?.clientHeight || 600);
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
     frameIt();
   }
   const ro = new ResizeObserver(resize);
-  ro.observe(host);
-  resize();
-
   let raf = 0;
-  let last = performance.now();
+  let last = 0;
   let shown = false;
   function frame(now) {
     raf = requestAnimationFrame(frame);
@@ -590,22 +604,34 @@ async function init(host, gone) {
     renderer.render(scene, camera);
     if (!shown) {
       shown = true;
-      canvas.style.opacity = "1";
+      host.classList.add("is-live");
     }
   }
-  raf = requestAnimationFrame(frame);
 
-  return () => {
-    cancelAnimationFrame(raf);
-    ro.disconnect();
-    scene.traverse((o) => {
-      o.geometry?.dispose();
-      for (const m of [].concat(o.material || [])) m.dispose();
-    });
-    disposables.forEach((x) => x.dispose());
-    scene.environment?.dispose();
-    pmrem.dispose();
-    renderer.dispose();
-    canvas.remove();
+  // draw it once out of sight, so every shader is compiled before it is shown
+  resize();
+  update(0);
+  await renderer.compileAsync?.(scene, camera);
+  renderer.render(scene, camera);
+
+  return {
+    attach(el) {
+      host = el;
+      const page = getComputedStyle(document.documentElement).getPropertyValue("--page").trim();
+      if (page) scene.background.set(page);
+      reset();
+      shown = false;
+      host.append(canvas);
+      ro.observe(host);
+      resize();
+      last = performance.now();
+      raf = requestAnimationFrame(frame);
+      return () => {
+        cancelAnimationFrame(raf);
+        ro.disconnect();
+        canvas.remove();
+        if (host === el) host = null;
+      };
+    },
   };
 }

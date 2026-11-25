@@ -2,7 +2,7 @@ import { playStep } from "./choices.js";
 import { mountCard } from "../card/card.js";
 import { hakataFace } from "../card/hakata.js";
 import { mountAnvil } from "../anvil/anvil.js";
-import { mountTea } from "../tea/tea.js";
+import { mountTea, prepareTea } from "../tea/tea.js";
 import { mountSword } from "../sword/sword.js";
 
 // Clicking the Magic Choc in the PLAY list opens a slideshow on
@@ -16,12 +16,29 @@ import { mountSword } from "../sword/sword.js";
 // The slides, in order. Replace the placeholders with real ones later.
 // Each can set the page colour while it's on screen (or keeps the yellow).
 const YELLOW = "#efff47";
+
+// The slow parts of the slides are made once and kept: the card's woven
+// faces (drawn in code) and the tea's 3D scene. They start in the
+// background as soon as the slideshow opens, so each slide is ready to draw
+// by the time you reach it.
+let face;
+const cardFace = () => (face ??= hakataFace());
+const warm = () => {
+  const idle = window.requestIdleCallback ?? ((f) => setTimeout(f, 200));
+  idle(
+    () => {
+      cardFace();
+      prepareTea();
+    },
+    { timeout: 1500 }
+  );
+};
 const SLIDES = [
   { kind: "icecream", label: "Magic Choc ice cream", page: YELLOW },
   { kind: "card", label: "Slate card, in Hakata-ori", page: YELLOW },
   { kind: "anvil", label: "Amplified Anvil, ARC Raiders", page: YELLOW },
-  { kind: "tea", label: "Sri Lankan green tea", page: YELLOW },
   { kind: "sword", label: "Demon-Destroyer Sword, Black Clover", page: YELLOW },
+  { kind: "tea", label: "Sri Lankan green tea", page: YELLOW },
 ];
 
 // 7x7 pixel arrows, drawn like CONTACT's
@@ -108,8 +125,43 @@ export function setupIcecreamView(stage) {
     frame.src = "/icecream/";
     frame.title = "Magic Choc ice cream";
     frame.allow = "autoplay";
-    frame.addEventListener("load", () => frame.classList.add("is-loaded"), { once: true });
     return frame;
+  };
+
+  // Every slide reveals the same way: as soon as it has drawn its first
+  // frame it fades in (the fade is in the page's CSS, .slide.is-shown). The
+  // 3D slides mark themselves .is-live (or .no-webgl); the ice cream frame's
+  // page marks its body .is-ready.
+  const whenClass = (node, names, done) => {
+    const has = () => names.some((n) => node.classList.contains(n));
+    if (has()) return done();
+    const mo = new MutationObserver(() => {
+      if (!has()) return;
+      mo.disconnect();
+      done();
+    });
+    mo.observe(node, { attributes: true, attributeFilter: ["class"] });
+  };
+  const whenReady = (el) => {
+    let fired = false;
+    const once = () => {
+      if (fired) return;
+      fired = true;
+      requestAnimationFrame(() => el.classList.add("is-shown"));
+    };
+    if (el.tagName === "IFRAME") {
+      el.addEventListener(
+        "load",
+        () => {
+          const body = el.contentDocument?.body;
+          if (body) whenClass(body, ["is-ready"], once);
+          else once();
+        },
+        { once: true }
+      );
+      setTimeout(once, 6000); // never leave it hidden
+    } else if (el.classList.contains("slide-placeholder")) once();
+    else whenClass(el, ["is-live", "no-webgl"], once);
   };
 
   // Show slide i (wrapping round). The ice cream frame only exists while its
@@ -125,7 +177,7 @@ export function setupIcecreamView(stage) {
     } else if (slide.kind === "card") {
       el = document.createElement("div");
       el.className = "slide-card";
-      unmount = mountCard(el, { face: hakataFace() }).destroy;
+      unmount = mountCard(el, { face: cardFace() }).destroy;
     } else if (slide.kind === "anvil") {
       el = document.createElement("div");
       el.className = "slide-anvil";
@@ -133,7 +185,6 @@ export function setupIcecreamView(stage) {
     } else if (slide.kind === "tea") {
       el = document.createElement("div");
       el.className = "slide-tea";
-      el.style.cssText = "position:absolute;inset:0";
       unmount = mountTea(el).destroy;
     } else if (slide.kind === "sword") {
       el = document.createElement("div");
@@ -146,6 +197,7 @@ export function setupIcecreamView(stage) {
     }
     setPage(slide.page);
     el.classList.add("slide");
+    whenReady(el);
     el.setAttribute("aria-label", slide.label);
     slides.replaceChildren(el);
     count.textContent = `${pad(index + 1)} / ${pad(SLIDES.length)}`;
@@ -189,6 +241,7 @@ export function setupIcecreamView(stage) {
   });
 
   const open = (start = 0) => {
+    warm();
     if (!view) {
       build();
       show(start, { focus: true });

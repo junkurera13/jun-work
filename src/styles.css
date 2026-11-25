@@ -719,3 +719,14 @@ html.on-page[style*="--dock-top"] .dock {
 .dock-add {
   display: none;
 }
+
+/* Inside the home page the slide fades the whole frame in, the same way as
+   every other slide, so the scene and its controls appear at once. */
+.on-page #scene,
+.on-page .controls,
+.on-page .dock,
+.on-page .weather,
+.on-page .sound-toggle {
+  transition-duration: 0s;
+  transition-delay: 0s;
+}

@@ -11,7 +11,12 @@
 // The back is the reverse of the cloth: weft-faced, the pattern in
 // negative, with loose floats and knots.
 
+import "@fontsource-variable/figtree";
 import { W, H, markStencil, drawChip, stamp } from "./face.js";
+
+// The card's lettering: a clean sans in widely spaced capitals, like the
+// name stamped on a real premium card.
+const FACE = `"Figtree Variable", "Helvetica Neue", system-ui, sans-serif`;
 
 const TW = 6; // thread width, pixels
 const COLS = Math.ceil(W / TW);
@@ -98,7 +103,7 @@ const newLayer = () => {
 };
 
 export async function hakataFace({ name = "JUN PARK" } = {}) {
-  await document.fonts?.ready;
+  await Promise.all([document.fonts?.load(`500 64px ${FACE}`), document.fonts?.load(`500 34px ${FACE}`)]);
   seed = 13;
   // the kind of thread at each cell, front view
   const ROWS = Math.ceil(H / TW);
@@ -134,11 +139,11 @@ export async function hakataFace({ name = "JUN PARK" } = {}) {
   fh.filter = "blur(3px)";
   stamp(fh, mark, 110, 110, "rgb(170, 0, 0)");
   fh.filter = "none";
-  const font = `96px "Tiny5", ui-monospace, monospace`;
+  const font = `500 64px ${FACE}`;
   for (const ctx of [fc, ff, fh]) {
     ctx.font = font;
     ctx.textBaseline = "alphabetic";
-    ctx.letterSpacing = "6px";
+    ctx.letterSpacing = "10px";
   }
   const nx = 110;
   const ny = H - 100;
@@ -203,18 +208,18 @@ async function backDetails({ color, finish, height }) {
   };
   const text = (str, x, y, size, align = "left") =>
     foil((ctx) => {
-      ctx.font = `${size}px "Tiny5", ui-monospace, monospace`;
-      ctx.letterSpacing = "3px";
+      ctx.font = `500 ${size}px ${FACE}`;
+      ctx.letterSpacing = "5px";
       ctx.textAlign = align;
       ctx.textBaseline = "alphabetic";
       ctx.fillText(str, x, y);
     });
 
   // all on the right: the woven band runs down the left on this side
-  text("HAKATA-ORI EDITION", W - pad, H * 0.44, 40, "right");
-  text("WOVEN SILK, FUKUOKA", W - pad, H * 0.44 + 52, 40, "right");
+  text("HAKATA-ORI EDITION", W - pad, H * 0.44, 34, "right");
+  text("WOVEN SILK, FUKUOKA", W - pad, H * 0.44 + 50, 34, "right");
   const mark = await markStencil(84);
-  text("NO. 001 / 001", W - pad - mark.width - 36, H - pad, 40, "right");
+  text("NO. 001 / 001", W - pad - mark.width - 36, H - pad, 34, "right");
   foil((ctx) => stamp(ctx, mark, W - pad - mark.width, H - pad - mark.height + 8, ctx.fillStyle));
 }
 

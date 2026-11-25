@@ -117,19 +117,33 @@
         position: absolute;
         inset: 0 var(--nav-w);
       }
+      /* Every slide reveals the same way: hidden until it has drawn
+         (src/home/icecream-view.js adds .is-shown), then one fade. */
+      .slide {
+        opacity: 0;
+        transition: opacity 250ms ease-out;
+      }
+      .slide.is-shown {
+        opacity: 1;
+      }
       iframe.slide {
         display: block;
         width: 100%;
         height: 100%;
         border: 0;
-        opacity: 0;
-        transition: opacity 400ms ease;
-      }
-      iframe.slide.is-loaded {
-        opacity: 1;
       }
       /* the card slide (src/card/card.js): the card fills it, with a soft
          shadow beneath */
+      /* The 3D slides keep their full size but are nudged up by half the
+         CONTACT row's space, so they sit a little above centre. */
+      .slides > .slide-card,
+      .slides > .slide-anvil,
+      .slides > .slide-sword,
+      .slides > .slide-tea {
+        position: absolute;
+        inset: 0;
+        translate: 0 calc((56px + 30px + env(safe-area-inset-bottom)) / -2);
+      }
       .slide-card {
         position: absolute;
         inset: 0;
@@ -138,12 +152,7 @@
         display: block;
         width: 100%;
         height: 100%;
-        opacity: 0;
-        transition: opacity 400ms ease;
         filter: drop-shadow(0 28px 32px rgba(40, 32, 10, 0.26)) drop-shadow(0 4px 6px rgba(40, 32, 10, 0.2));
-      }
-      .slide-card.is-live .card-canvas {
-        opacity: 1;
       }
       /* the Amplified Anvil slide (src/anvil/anvil.js): interactive 3D
          hand cannon with a crisp studio shadow beneath */
@@ -155,12 +164,7 @@
         display: block;
         width: 100%;
         height: 100%;
-        opacity: 0;
-        transition: opacity 400ms ease;
         filter: drop-shadow(0 30px 34px rgba(35, 38, 4, 0.30)) drop-shadow(0 5px 8px rgba(35, 38, 4, 0.22));
-      }
-      .slide-anvil.is-live .anvil-canvas {
-        opacity: 1;
       }
       /* the Demon-Destroyer Sword slide (src/sword/sword.js): ancient
          forged dark-iron blade with a studio drop shadow beneath */
@@ -172,12 +176,7 @@
         display: block;
         width: 100%;
         height: 100%;
-        opacity: 0;
-        transition: opacity 400ms ease;
         filter: drop-shadow(0 30px 34px rgba(35, 38, 4, 0.34)) drop-shadow(0 5px 8px rgba(35, 38, 4, 0.24));
-      }
-      .slide-sword.is-live .sword-canvas {
-        opacity: 1;
       }
       .slide-placeholder {
         position: absolute;
