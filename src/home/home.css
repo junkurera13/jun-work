@@ -23,6 +23,12 @@ body {
 
 /* ---- choices (WORK / PLAY / ABOUT) ---- */
 
+/* no grey flash over the sharp boxes and words when tapped */
+a,
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
 .choice {
   pointer-events: auto;
   appearance: none;

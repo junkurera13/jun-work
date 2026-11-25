@@ -1,6 +1,7 @@
 // WORK: black interactive spatial canvas on the right of the menu.
 // Projects live in distinct Figma-style spatial sections ([data-project]) on
-// the infinite board. Drag empty canvas (or scroll) to pan, pinch / +/- to
+// the infinite board (side by side; stacked top to bottom on phones). Drag
+// empty canvas (or scroll) to pan, pinch (trackpad or two fingers) / +/- to
 // zoom, click bottom-left project chips to jump between projects, click any
 // artifact card to focus it cleanly, and use top-right expand for full-page view.
 
@@ -12,6 +13,10 @@ const MIN_ZOOM = 0.35;
 const MAX_ZOOM = 2.2;
 const BASE_GRID = 28;
 const ZOOM_STEP = 1.25;
+// On phones (and upright tablets) the projects stack vertically, this far apart (board pixels)
+const STACK_GAP = 160;
+// (the same query as the phone layout in layout.css)
+const narrowMQ = matchMedia("(max-width: 640px), (orientation: portrait) and (max-width: 1024px)");
 
 export function setupWork() {
   const viewport = document.querySelector(".work-canvas");
@@ -57,6 +62,10 @@ export function setupWork() {
   let hasInitialFit = false;
   let viewW = 0;
   let viewH = 0;
+  let layoutMode = null; // "wide" | "narrow", once laid out
+  // two-finger pinch: the fingers down, and the gesture's starting state
+  const touches = new Map();
+  let pinch = null;
   let lastZoomText = "";
   let lastGridStep = -1;
   let movingCanvas = false;
@@ -71,9 +80,44 @@ export function setupWork() {
     y: parseFloat(sec.style.getPropertyValue("--y")) || 0,
     hw: (sec.offsetWidth || 1400) / 2,
     hh: 460,
+    homeX: parseFloat(sec.style.getPropertyValue("--x")) || 0,
+    homeY: parseFloat(sec.style.getPropertyValue("--y")) || 0,
     videos: [...sec.querySelectorAll("video")],
     visible: null,
   }));
+
+  // The sections sit side by side, as placed in index.html. On phones that
+  // row is far wider than the screen, so they stack top to bottom instead
+  // (needs the canvas shown, to measure them).
+  const layoutSections = (narrow) => {
+    let y = 0;
+    for (const s of sectionMeta) {
+      if (narrow) {
+        const h = s.el.offsetHeight || 2 * s.hh;
+        s.x = 0;
+        s.y = y + h / 2;
+        y += h + STACK_GAP;
+      } else {
+        s.x = s.homeX;
+        s.y = s.homeY;
+      }
+      s.el.style.setProperty("--x", `${s.x}px`);
+      s.el.style.setProperty("--y", `${s.y}px`);
+    }
+    if (narrow) {
+      // centre the stack on the board's origin, like the row
+      const mid = (y - STACK_GAP) / 2;
+      for (const s of sectionMeta) {
+        s.y -= mid;
+        s.el.style.setProperty("--y", `${s.y}px`);
+      }
+    }
+  };
+
+  // Zoom can go far enough out to show a whole project, even on a phone.
+  const minZoom = () => Math.min(MIN_ZOOM, viewW > 0 ? (viewW - 24) / 1500 : MIN_ZOOM);
+  const clampZoom = (z) => Math.max(minZoom(), Math.min(MAX_ZOOM, z));
+  const isNarrow = () => narrowMQ.matches;
 
   const syncVisibility = () => {
     if (viewport.hidden || viewW <= 0 || viewH <= 0) {
@@ -145,6 +189,15 @@ export function setupWork() {
   const syncProjectNav = () => {
     for (const [id, btn] of projBtns) {
       btn.setAttribute("aria-current", id === activeProject ? "true" : "false");
+    }
+    // On phones the chips scroll sideways: keep the current one in view
+    const btn = projBtns.get(activeProject);
+    if (btn && projNav && projNav.scrollWidth > projNav.clientWidth) {
+      const pad = 12;
+      const left = btn.offsetLeft - pad;
+      const right = btn.offsetLeft + btn.offsetWidth + pad - projNav.clientWidth;
+      if (projNav.scrollLeft > left) projNav.scrollTo({ left, behavior: "smooth" });
+      else if (projNav.scrollLeft < right) projNav.scrollTo({ left: right, behavior: "smooth" });
     }
   };
 
@@ -264,7 +317,7 @@ export function setupWork() {
 
     const availW = Math.max(120, vr.width - padX * 2);
     const availH = Math.max(120, vr.height - padTop - padBottom);
-    const fitZ = Math.max(MIN_ZOOM, Math.min(maxZ, availW / br.w, availH / br.h));
+    const fitZ = Math.max(minZoom(), Math.min(maxZ, availW / br.w, availH / br.h));
     const offsetY = (padTop - padBottom) / 2;
     const tx = -br.x * fitZ;
     const ty = -br.y * fitZ + offsetY;
@@ -290,8 +343,14 @@ export function setupWork() {
     clearFocus();
     activeProject = sec.dataset.project;
     syncProjectNav();
-    fitElement(sec, { padX: 46, padTop: 64, padBottom: 88, maxZ: 1.02, instant });
+    // (on phones: fit the width and leave the neighbours peeking above and
+    // below, as there's height to spare)
+    const pads = isNarrow() ? { padX: 12, padTop: 60, padBottom: 60 } : { padX: 46, padTop: 64, padBottom: 88 };
+    fitElement(sec, { ...pads, maxZ: 1.02, instant });
   };
+
+  const fitCard = (card) =>
+    fitElement(card, isNarrow() ? { padX: 16, padTop: 60, padBottom: 64, maxZ: 1.75 } : { padX: 64, padTop: 68, padBottom: 92, maxZ: 1.75 });
 
   const toggleFocusCard = (card) => {
     if (focusedCard === card) {
@@ -301,7 +360,7 @@ export function setupWork() {
     clearFocus();
     focusedCard = card;
     card.classList.add("is-focused");
-    fitElement(card, { padX: 64, padTop: 68, padBottom: 92, maxZ: 1.75 });
+    fitCard(card);
   };
 
   const animateZoom = (nextZoom) => {
@@ -309,7 +368,7 @@ export function setupWork() {
     const curZoom = targetZoom ?? zoom;
     const curX = targetX ?? panX;
     const curY = targetY ?? panY;
-    const clamped = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, nextZoom));
+    const clamped = clampZoom(nextZoom);
     const ratio = clamped / curZoom;
     targetZoom = clamped;
     targetX = curX * ratio;
@@ -323,7 +382,7 @@ export function setupWork() {
     fsBtn?.setAttribute("aria-pressed", String(on));
     fsBtn?.setAttribute("aria-label", on ? "Exit fullscreen canvas" : "Expand canvas fullscreen");
     requestAnimationFrame(() => {
-      if (focusedCard) fitElement(focusedCard, { padX: 64, padTop: 64, padBottom: 72, maxZ: 1.75 });
+      if (focusedCard) fitCard(focusedCard);
       else fitProject(activeProject);
     });
   };
@@ -376,8 +435,52 @@ export function setupWork() {
     }
   });
 
+  // Centre of the viewport, for zooming about a point
+  const viewCentre = () => {
+    const r = viewport.getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  };
+  const startPinch = () => {
+    const [a, b] = [...touches.values()];
+    const c = viewCentre();
+    pinch = {
+      dist: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)),
+      // the board point under the fingers' midpoint stays under it
+      bx: ((a.x + b.x) / 2 - c.x - panX) / zoom,
+      by: ((a.y + b.y) / 2 - c.y - panY) / zoom,
+      zoom,
+    };
+    // a pinch is never a tap on a card, and not a pan
+    panning = false;
+    pointerId = null;
+    downCard = null;
+    vx = vy = 0;
+    targetX = targetY = targetZoom = null;
+    clearFocus();
+    markMoving();
+  };
+  const movePinch = () => {
+    const [a, b] = [...touches.values()];
+    const c = viewCentre();
+    zoom = clampZoom((pinch.zoom * Math.hypot(a.x - b.x, a.y - b.y)) / pinch.dist);
+    panX = (a.x + b.x) / 2 - c.x - pinch.bx * zoom;
+    panY = (a.y + b.y) / 2 - c.y - pinch.by * zoom;
+    markMoving();
+    apply();
+    updateNearestProject();
+  };
+
   viewport.addEventListener("pointerdown", (e) => {
     if (e.button !== 0 && e.button !== 1) return;
+    if (e.pointerType === "touch") {
+      touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      viewport.setPointerCapture?.(e.pointerId);
+      if (touches.size === 2) {
+        startPinch();
+        return;
+      }
+      if (touches.size > 2) return;
+    }
     panning = true;
     pointerId = e.pointerId;
     downCard = e.target.closest(".work-card[data-focus]");
@@ -391,6 +494,13 @@ export function setupWork() {
   });
 
   viewport.addEventListener("pointermove", (e) => {
+    if (touches.has(e.pointerId)) {
+      touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pinch && touches.size >= 2) {
+        movePinch();
+        return;
+      }
+    }
     if (!panning || e.pointerId !== pointerId) return;
     const dx = e.clientX - lastX;
     const dy = e.clientY - lastY;
@@ -410,6 +520,25 @@ export function setupWork() {
   });
 
   const endPan = (e) => {
+    if (touches.delete(e.pointerId) && pinch) {
+      if (touches.size < 2) {
+        pinch = null;
+        viewport.releasePointerCapture?.(e.pointerId);
+        // the finger still down carries on panning (but can't tap a card)
+        const [rest] = [...touches.entries()];
+        if (rest) {
+          panning = true;
+          pointerId = rest[0];
+          lastX = rest[1].x;
+          lastY = rest[1].y;
+          panMoved = Infinity;
+          vx = vy = 0;
+        } else {
+          kick();
+        }
+      }
+      return;
+    }
     if (!panning || e.pointerId !== pointerId) return;
     panning = false;
     pointerId = null;
@@ -437,7 +566,7 @@ export function setupWork() {
       vx = vy = 0;
       if (e.ctrlKey || e.metaKey) {
         const factor = Math.exp(-e.deltaY * 0.008);
-        const nextZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom * factor));
+        const nextZoom = clampZoom(zoom * factor);
         const ratio = nextZoom / zoom;
         const r = viewport.getBoundingClientRect();
         const cx = e.clientX - (r.left + r.width / 2);
@@ -471,7 +600,15 @@ export function setupWork() {
       if (s.el.offsetWidth > 0) s.hw = s.el.offsetWidth / 2;
       if (s.el.offsetHeight > 0) s.hh = s.el.offsetHeight / 2;
     }
-    if (viewW > 0 && !hasInitialFit) {
+    const mode = isNarrow() ? "narrow" : "wide";
+    if (viewW > 0 && mode !== layoutMode) {
+      // first shown, or crossed between phone and wider: (re)place the
+      // projects and frame the current one
+      layoutMode = mode;
+      layoutSections(mode === "narrow");
+      hasInitialFit = true;
+      fitProject(activeProject, true);
+    } else if (viewW > 0 && !hasInitialFit) {
       hasInitialFit = true;
       fitProject(activeProject, true);
     } else {

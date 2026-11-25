@@ -10,8 +10,8 @@ import { mountSword } from "../sword/sword.js";
 // (/icecream/, in a frame); the others are placeholders for now. A widget on
 // the right (up arrow, count, down arrow, or the arrow keys) moves between
 // them. Choosing ABOUT, PLAY or WORK again closes it. Back/forward work too,
-// via the #icecream hash. On phones the right side is too narrow, so the
-// link just goes to /icecream/ as usual.
+// via the #icecream hash. On phones the slideshow fills the space under the
+// menu and its arrows sit in a row beneath it (layout.css).
 
 // The slides, in order. Replace the placeholders with real ones later.
 // Each can set the page colour while it's on screen (or keeps the yellow).
@@ -60,7 +60,6 @@ export function setupIcecreamView(stage) {
   const link = stage.querySelector(".live-choc");
   if (!link) return;
   const lists = stage.querySelectorAll("[data-list]");
-  const wide = matchMedia("(min-width: 641px)");
 
   let view; // the open slideshow, or null
   let slides; // its slide area
@@ -91,7 +90,10 @@ export function setupIcecreamView(stage) {
     // The scale it needs: below 1 the whole page shrinks; above 1 it would
     // spill past the edges, so the page stays full size and zooms its own
     // camera in by the rest instead.
-    const want = (1.508 * itemH) / stage.clientHeight;
+    // (the slide area: the stage's full height, except on phones, where the
+    // arrows' row takes the bottom of it, as it does under the list)
+    const H = slides.clientHeight || stage.clientHeight;
+    const want = (1.508 * itemH) / H;
     const k = Math.min(want, 1);
     const zoom = String(want / k);
     const lift = 0.0285 * itemH + up;
@@ -103,7 +105,6 @@ export function setupIcecreamView(stage) {
     // so it can space the weather words and the flavours evenly around it.
     // (Measured in the frame: from the chocolate's top at 3.7% of an item's
     // height to the stick's end at 95.8%.)
-    const H = stage.clientHeight;
     const itemTop = H / 2 - up - itemH / 2;
     const toFrame = (y) => Math.round((y - H / 2) / k + H / 2);
     const iceTop = String(toFrame(itemTop + 0.037 * itemH));
@@ -268,10 +269,10 @@ export function setupIcecreamView(stage) {
     for (const list of lists) list.hidden = list.dataset.list !== word;
   };
 
-  const sync = () => (location.hash === "#icecream" && wide.matches ? open() : close());
+  const sync = () => (location.hash === "#icecream" ? open() : close());
 
   link.addEventListener("click", (e) => {
-    if (!wide.matches || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
     e.preventDefault();
     if (location.hash !== "#icecream") history.pushState(null, "", "#icecream");
     open();
@@ -311,6 +312,5 @@ export function setupIcecreamView(stage) {
   }
 
   addEventListener("popstate", sync);
-  wide.addEventListener("change", sync);
   sync();
 }
